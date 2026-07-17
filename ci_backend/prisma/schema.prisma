@@ -1,0 +1,207 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum ContactSource {
+  BUSINESS_CARD
+  QR
+  NFC
+  FACE_RECOGNITION
+  MANUAL
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id            String         @id @default(uuid())
+  fullName      String
+  email         String         @unique
+  password      String
+  organization  String
+  role          Role           @default(USER)
+  profileImage  String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  contacts      Contact[]
+  uploadedFiles UploadedFile[]
+  tags          Tag[]
+  notes         Note[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+model Contact {
+  id                 String             @id @default(uuid())
+  userId             String
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name               String
+  company            String?
+  designation        String?
+  email              String?
+  phone              String?
+  website            String?
+  address            String?
+  skills             String[]           @default([])
+  industry           String?
+  experience         Json?
+  education          Json?
+  interests          String[]           @default([])
+  hobbies            String[]           @default([])
+  decisionMakerScore Int                @default(0)
+  source             ContactSource      @default(MANUAL)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  tags               Tag[]              @relation("ContactTags")
+  notes              Note[]
+  businessCards      BusinessCard[]
+  linkedInProfile    LinkedInProfile?
+  aiSummary          AISummary?
+  faceRecognitions   FaceRecognition[]
+  nfcData            NFCData[]
+  uploadedFiles      UploadedFile[]
+
+  @@map("contacts")
+}
+
+model BusinessCard {
+  id             String       @id @default(uuid())
+  contactId      String?
+  contact        Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  uploadedFileId String
+  uploadedFile   UploadedFile @relation(fields: [uploadedFileId], references: [id], onDelete: Cascade)
+  ocrStatus      JobStatus    @default(PENDING)
+  extractedData  Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("business_cards")
+}
+
+model UploadedFile {
+  id               String            @id @default(uuid())
+  filename         String
+  originalName     String
+  mimeType         String
+  size             Int
+  path             String
+  url              String
+  checksum         String?
+  checksumAlgo     String?
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contactId        String?
+  contact          Contact?          @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  createdAt        DateTime          @default(now())
+  businessCards    BusinessCard[]
+  faceRecognitions FaceRecognition[]
+
+  @@map("uploaded_files")
+}
+
+model Tag {
+  id        String    @id @default(uuid())
+  name      String
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contacts  Contact[] @relation("ContactTags")
+  createdAt DateTime  @default(now())
+
+  @@unique([name, userId])
+  @@map("tags")
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  content   String
+  contactId String
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("notes")
+}
+
+model LinkedInProfile {
+  id               String    @id @default(uuid())
+  contactId        String    @unique
+  contact          Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  salesNavigatorId String?
+  linkedInUrl      String?
+  profileData      Json?
+  enrichmentStatus JobStatus @default(PENDING)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@map("linkedin_profiles")
+}
+
+model AISummary {
+  id          String    @id @default(uuid())
+  contactId   String    @unique
+  contact     Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  summaryText String
+  status      JobStatus @default(PENDING)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("ai_summaries")
+}
+
+model FaceRecognition {
+  id               String       @id @default(uuid())
+  contactId        String?
+  contact          Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  uploadedFileId   String
+  uploadedFile     UploadedFile @relation(fields: [uploadedFileId], references: [id], onDelete: Cascade)
+  status           JobStatus    @default(PENDING)
+  recognizedResult Json?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@map("face_recognitions")
+}
+
+model NFCData {
+  id        String   @id @default(uuid())
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  payload   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("nfc_data")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String?
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}
