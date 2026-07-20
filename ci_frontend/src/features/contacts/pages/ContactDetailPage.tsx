@@ -37,7 +37,7 @@ export const ContactDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const addToast = useToastStore((state) => state.addToast);
 
-  const [activeTab, setActiveTab] = useState<'details' | 'notes' | 'timeline'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'intelligence' | 'notes' | 'timeline'>('details');
   const [newNote, setNewNote] = useState('');
   
   // Note delete confirmation state
@@ -369,19 +369,19 @@ export const ContactDetailPage: React.FC = () => {
         {/* Right Column: Tab panels */}
         <div className="lg:col-span-2 flex flex-col gap-6">
           {/* Tabs bar */}
-          <div className="border-b border-slate-200 flex gap-4 shrink-0">
-            {(['details', 'notes', 'timeline'] as const).map((tab) => (
+          <div className="border-b border-slate-200 flex gap-4 shrink-0 overflow-x-auto">
+            {(['details', 'intelligence', 'notes', 'timeline'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`py-2 px-1 text-xs font-bold uppercase tracking-wider border-b-2 outline-none transition-all
+                className={`py-2 px-1 text-xs font-bold uppercase tracking-wider border-b-2 outline-none transition-all whitespace-nowrap
                   ${
                     activeTab === tab
-                      ? 'border-indigo-600 text-indigo-600'
-                      : 'border-transparent text-slate-400 hover:text-slate-600'
+                      ? tab === 'intelligence' ? 'border-purple-600 text-purple-700' : 'border-indigo-600 text-indigo-600'
+                      : tab === 'intelligence' ? 'border-transparent text-purple-400 hover:text-purple-600' : 'border-transparent text-slate-400 hover:text-slate-600'
                   }`}
               >
-                {tab === 'details' ? 'Profile details' : tab === 'notes' ? 'Meeting Notes' : 'Timeline events'}
+                {tab === 'details' ? 'Profile details' : tab === 'notes' ? 'Meeting Notes' : tab === 'timeline' ? 'Timeline events' : '✨ AI Intelligence'}
               </button>
             ))}
           </div>
@@ -453,93 +453,144 @@ export const ContactDetailPage: React.FC = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
 
-                {/* AI Professional Summary */}
-                <div className="border-t border-slate-100 pt-5">
-                  <h3 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">AI Professional Summary</h3>
-                  <div className="text-xs text-slate-600 leading-relaxed font-semibold">
-                    {contact.aiSummary?.summaryText ? (
-                      <p>{contact.aiSummary.summaryText}</p>
-                    ) : (
-                      <p className="text-slate-400 italic">No summary description generated yet. Click "Refresh Enrichment".</p>
+            {/* AI INTELLIGENCE TAB */}
+            {activeTab === 'intelligence' && (
+              <div className="space-y-6">
+                {!aiProfile && enrichmentStatus !== 'COMPLETED' ? (
+                  <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-slate-100 rounded-xl">
+                    <div className="p-4 bg-purple-50 rounded-full mb-4">
+                      <Cpu className="h-8 w-8 text-purple-500 animate-pulse" />
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-800">No Intelligence Profile Available</h3>
+                    <p className="text-xs text-slate-500 mt-2 max-w-sm">
+                      Trigger the Business Intelligence Agent using the "Refresh Enrichment" button above to generate a comprehensive profile.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Top Stats */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Verification Status */}
+                      <div className="p-4 bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-xl">
+                        <h3 className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider mb-1">Verification Status</h3>
+                        <p className="text-sm font-bold text-indigo-900">{aiProfile?.verificationStatus || 'Verified via LinkedIn'}</p>
+                      </div>
+                      
+                      {/* AI Insights */}
+                      <div className="p-4 bg-gradient-to-br from-purple-50 to-white border border-purple-100 rounded-xl">
+                        <h3 className="text-[10px] text-purple-400 font-bold uppercase tracking-wider mb-1">Professional Insights</h3>
+                        <p className="text-sm font-bold text-purple-900">{aiProfile?.insights || 'Decision Maker / Specialist'}</p>
+                      </div>
+                    </div>
+
+                    {/* AI Professional Summary */}
+                    <div className="border-t border-slate-100 pt-5">
+                      <h3 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Executive Summary</h3>
+                      <div className="text-sm text-slate-700 leading-relaxed font-medium bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        {aiProfile?.summary || contact.aiSummary?.summaryText || (
+                          <span className="text-slate-400 italic">No summary description generated yet.</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Conversation Starters */}
+                    {aiProfile?.conversationStarters && aiProfile.conversationStarters.length > 0 && (
+                      <div className="border-t border-slate-100 pt-5">
+                        <h3 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-3">Conversation Starters</h3>
+                        <div className="space-y-2">
+                          {aiProfile.conversationStarters.map((starter: string, idx: number) => (
+                            <div key={idx} className="flex items-start gap-2.5 p-3 bg-indigo-50/50 rounded-lg border border-indigo-50">
+                              <span className="text-indigo-500 mt-0.5">💬</span>
+                              <p className="text-xs font-semibold text-indigo-900">{starter}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
-                  </div>
-                </div>
 
-                {/* Skills tags cloud */}
-                <div className="border-t border-slate-100 pt-5">
-                  <h3 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2.5">Skills</h3>
-                  {contact.skills && contact.skills.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {contact.skills.map((skill) => (
-                        <span
-                          key={skill}
-                          className="px-2.5 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg text-xs font-bold"
-                        >
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-400 italic">No skills cataloged.</p>
-                  )}
-                </div>
-
-                {/* Experience History (Enrichment payload data) */}
-                {enrichmentStatus === 'COMPLETED' && aiProfile?.experience && aiProfile.experience.length > 0 && (
-                  <div className="border-t border-slate-100 pt-5">
-                    <h3 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-3">Work Experience</h3>
-                    <div className="space-y-3">
-                      {aiProfile.experience.map((exp: any, idx: number) => (
-                        <div key={idx} className="flex flex-col gap-0.5">
-                          <h4 className="text-xs font-bold text-slate-800">{exp.title}</h4>
-                          <div className="flex justify-between items-center text-[11px] text-slate-500 font-semibold mt-0.5">
-                            <span>{exp.company}</span>
-                            <span>{exp.period}</span>
-                          </div>
+                    {/* Skills tags cloud */}
+                    <div className="border-t border-slate-100 pt-5">
+                      <h3 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-3">Verified Skills</h3>
+                      {contact.skills && contact.skills.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {contact.skills.map((skill) => (
+                            <span
+                              key={skill}
+                              className="px-3 py-1 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-100/50 text-indigo-700 rounded-lg text-xs font-bold shadow-sm shadow-purple-500/5"
+                            >
+                              {skill}
+                            </span>
+                          ))}
                         </div>
-                      ))}
+                      ) : (
+                        <p className="text-xs text-slate-400 italic">No skills cataloged.</p>
+                      )}
                     </div>
-                  </div>
-                )}
 
-                {/* Education History (Enrichment payload data) */}
-                {enrichmentStatus === 'COMPLETED' && aiProfile?.education && aiProfile.education.length > 0 && (
-                  <div className="border-t border-slate-100 pt-5">
-                    <h3 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-3">Education</h3>
-                    <div className="space-y-3">
-                      {aiProfile.education.map((edu: any, idx: number) => (
-                        <div key={idx} className="flex flex-col gap-0.5">
-                          <h4 className="text-xs font-bold text-slate-800">{edu.degree}</h4>
-                          <div className="flex justify-between items-center text-[11px] text-slate-500 font-semibold mt-0.5">
-                            <span>{edu.school}</span>
-                            <span>{edu.year}</span>
-                          </div>
+                    {/* Experience History (Enrichment payload data) */}
+                    {aiProfile?.experience && aiProfile.experience.length > 0 && (
+                      <div className="border-t border-slate-100 pt-5">
+                        <h3 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-4">Career Timeline</h3>
+                        <div className="relative border-l-2 border-indigo-100 pl-4 ml-2 space-y-6">
+                          {aiProfile.experience.map((exp: any, idx: number) => (
+                            <div key={idx} className="relative flex flex-col gap-1">
+                              <span className="absolute -left-[23px] top-1.5 h-2.5 w-2.5 rounded-full bg-indigo-500 border-2 border-white shadow-sm" />
+                              <h4 className="text-sm font-bold text-slate-800">{exp.title}</h4>
+                              <div className="flex items-center text-xs text-slate-500 font-semibold mt-0.5">
+                                <span className="text-indigo-600">{exp.company}</span>
+                                <span className="mx-2">•</span>
+                                <span>{exp.period}</span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                      </div>
+                    )}
 
-                {/* Social links */}
-                {enrichmentStatus === 'COMPLETED' && aiProfile?.publicProfiles && aiProfile.publicProfiles.length > 0 && (
-                  <div className="border-t border-slate-100 pt-5">
-                    <h3 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2.5">Public Social Profiles</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {aiProfile.publicProfiles.map((p: any, idx: number) => (
-                        <a
-                          key={idx}
-                          href={p.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-slate-600 hover:text-indigo-700 rounded-lg text-xs font-bold transition-all"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                          {p.platform}
-                        </a>
-                      ))}
-                    </div>
-                  </div>
+                    {/* Education History (Enrichment payload data) */}
+                    {aiProfile?.education && aiProfile.education.length > 0 && (
+                      <div className="border-t border-slate-100 pt-5">
+                        <h3 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-4">Education</h3>
+                        <div className="relative border-l-2 border-purple-100 pl-4 ml-2 space-y-6">
+                          {aiProfile.education.map((edu: any, idx: number) => (
+                            <div key={idx} className="relative flex flex-col gap-1">
+                              <span className="absolute -left-[23px] top-1.5 h-2.5 w-2.5 rounded-full bg-purple-500 border-2 border-white shadow-sm" />
+                              <h4 className="text-sm font-bold text-slate-800">{edu.degree}</h4>
+                              <div className="flex items-center text-xs text-slate-500 font-semibold mt-0.5">
+                                <span className="text-purple-600">{edu.school}</span>
+                                <span className="mx-2">•</span>
+                                <span>{edu.year}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Social links */}
+                    {aiProfile?.publicProfiles && aiProfile.publicProfiles.length > 0 && (
+                      <div className="border-t border-slate-100 pt-5">
+                        <h3 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-3">Public Profiles</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {aiProfile.publicProfiles.map((p: any, idx: number) => (
+                            <a
+                              key={idx}
+                              href={p.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 hover:text-indigo-700 rounded-lg text-xs font-bold transition-all shadow-sm"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                              {p.platform}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}

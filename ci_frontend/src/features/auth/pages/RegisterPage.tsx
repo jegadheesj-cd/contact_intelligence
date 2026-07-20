@@ -31,12 +31,12 @@ export const RegisterPage: React.FC = () => {
     setLoading(true);
     setApiError(null);
     try {
-      // Map name -> fullName and pass organization optionally to match backend register schema
+      // Map the form field name to the API field name. Organization is optional.
       await api.post('/auth/register', {
         fullName: data.name,
         email: data.email,
         password: data.password,
-        organization: data.organization || null,
+        organization: data.organization?.trim() || undefined,
       });
 
       addToast('Account created successfully! Please sign in.', 'success');

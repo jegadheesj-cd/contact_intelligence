@@ -38,7 +38,8 @@ export class AuthService {
         fullName: data.fullName,
         email: data.email,
         password: hashedPassword,
-        organization: data.organization,
+        // The UI allows this field to be blank; the database requires a value.
+        organization: data.organization || 'Individual',
         role: data.role || Role.USER,
       },
     });

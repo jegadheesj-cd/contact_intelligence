@@ -43,6 +43,13 @@ export const ScannerPage: React.FC = () => {
     website: '',
     address: '',
     linkedInUrl: '',
+    department: '',
+    industry: '',
+    postalCode: '',
+    skills: '',
+    professionalSummary: '',
+    experience: [] as any[],
+    education: [] as any[],
   });
 
   // Scanner mutations & queries
@@ -59,7 +66,7 @@ export const ScannerPage: React.FC = () => {
     if (card) {
       if (card.ocrStatus === 'COMPLETED') {
         // Pre-fill review form with parsed OCR fields
-        const fields = card.extractedData?.fields || {};
+        const fields = (card.extractedData?.fields || {}) as any;
         setFormFields({
           name: fields.name || '',
           company: fields.company || '',
@@ -69,6 +76,13 @@ export const ScannerPage: React.FC = () => {
           website: fields.website || '',
           address: fields.address || '',
           linkedInUrl: fields.linkedin_url || '',
+          department: fields.department || '',
+          industry: fields.industry || '',
+          postalCode: fields.postalCode || '',
+          skills: Array.isArray(fields.skills) ? fields.skills.join(', ') : (fields.skills || ''),
+          professionalSummary: fields.professionalSummary || '',
+          experience: fields.experience || [],
+          education: fields.education || [],
         });
         setStep('review');
       } else if (card.ocrStatus === 'FAILED') {
@@ -161,6 +175,11 @@ export const ScannerPage: React.FC = () => {
         website: formFields.website || null,
         address: formFields.address || null,
         linkedInUrl: formFields.linkedInUrl || null,
+        department: formFields.department || null,
+        industry: formFields.industry || null,
+        skills: formFields.skills ? formFields.skills.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+        experience: formFields.experience || null,
+        education: formFields.education || null,
       };
 
       await updateContactMutation.mutateAsync({
@@ -196,6 +215,58 @@ export const ScannerPage: React.FC = () => {
   // Compute full static url for uploaded image
   const serverBase = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
   const imageUrl = card?.uploadedFile?.url ? `${serverBase}${card.uploadedFile.url}` : localPreview;
+  const isEnhanced = false;
+
+  const getUnderstanding = (fieldName: string) => {
+    const extractedData = card?.extractedData as any;
+    if (!extractedData?.understanding) return null;
+    return extractedData.understanding.find((u: any) => 
+      u.field.toLowerCase().replace(/\s+/g, '') === fieldName.toLowerCase()
+    );
+  };
+
+  const getFieldClass = (fieldName: keyof typeof formFields) => {
+    const u = getUnderstanding(fieldName);
+    if (!u) return '';
+    if (u.confidence >= 0.8) return 'border-emerald-200 focus:border-emerald-500 focus:ring-emerald-100';
+    if (u.confidence >= 0.7) return 'border-amber-200 focus:border-amber-500 focus:ring-amber-100';
+    return 'border-rose-200 focus:border-rose-500 focus:ring-rose-100';
+  };
+
+  const renderVerificationBadge = (fieldName: keyof typeof formFields) => {
+    const u = getUnderstanding(fieldName);
+    if (!u) return null;
+
+    let badgeClass = '';
+    let label = '';
+    if (u.confidence >= 0.8) {
+      badgeClass = 'bg-emerald-50 text-emerald-600 border border-emerald-100';
+      label = `High (${(u.confidence * 100).toFixed(0)}%)`;
+    } else if (u.confidence >= 0.7) {
+      badgeClass = 'bg-amber-50 text-amber-600 border border-amber-100';
+      label = `Medium (${(u.confidence * 100).toFixed(0)}%)`;
+    } else {
+      badgeClass = 'bg-rose-50 text-rose-600 border border-rose-100 animate-pulse';
+      label = `Low (${(u.confidence * 100).toFixed(0)}%)`;
+    }
+
+    return (
+      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${badgeClass}`} title={u.reasoning}>
+        {label}
+      </span>
+    );
+  };
+
+  const renderEnhancementMeta = (fieldName: keyof typeof formFields) => {
+    const u = getUnderstanding(fieldName);
+    if (!u) return null;
+
+    return (
+      <p className="text-[10px] text-slate-400 mt-1 pl-1 border-l-2 border-slate-200 ml-1">
+        <span className="font-semibold text-slate-500">AI Reasoning:</span> {u.reasoning}
+      </p>
+    );
+  };
 
   return (
     <div className="flex flex-col gap-6 animate-slide-down max-w-5xl mx-auto w-full">
@@ -358,131 +429,305 @@ export const ScannerPage: React.FC = () => {
             <h2 className="text-xs font-bold text-slate-700 tracking-wider uppercase mb-4">
               Edit Extracted Fields
             </h2>
+
             <form onSubmit={handleSaveReview} className="space-y-4">
-              {/* Field: Name */}
-              <div>
-                <Input
-                  label="Name (Required)"
-                  type="text"
-                  value={formFields.name}
-                  onChange={(e) => setFormFields({ ...formFields, name: e.target.value })}
-                  error={!formFields.name ? 'Name is required' : undefined}
-                />
-              </div>
+                    <div className="space-y-4">
+                      {/* Field: Name */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                            Name (Required)
+                          </label>
+                          {renderVerificationBadge('name')}
+                        </div>
+                        <Input
+                          type="text"
+                          value={formFields.name}
+                          onChange={(e) => setFormFields({ ...formFields, name: e.target.value })}
+                          error={!formFields.name ? 'Name is required' : undefined}
+                          className={getFieldClass('name')}
+                        />
+                        {renderEnhancementMeta('name')}
+                      </div>
 
-              {/* Field: Company */}
-              <div className="relative">
-                <Input
-                  label="Company"
-                  type="text"
-                  value={formFields.company}
-                  onChange={(e) => setFormFields({ ...formFields, company: e.target.value })}
-                />
-                {!formFields.company && (
-                  <span className="absolute right-3 top-9 flex items-center gap-1 text-[9px] font-extrabold text-amber-600/85">
-                    <AlertTriangle className="h-3 w-3 shrink-0" /> Check
-                  </span>
-                )}
-              </div>
+                      {/* Field: Company */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                            Company
+                          </label>
+                          {renderVerificationBadge('company')}
+                        </div>
+                        <Input
+                          type="text"
+                          value={formFields.company}
+                          onChange={(e) => setFormFields({ ...formFields, company: e.target.value })}
+                          className={getFieldClass('company')}
+                        />
+                        {renderEnhancementMeta('company')}
+                      </div>
 
-              {/* Field: Designation */}
-              <div className="relative">
-                <Input
-                  label="Designation / Title"
-                  type="text"
-                  value={formFields.designation}
-                  onChange={(e) => setFormFields({ ...formFields, designation: e.target.value })}
-                />
-                {!formFields.designation && (
-                  <span className="absolute right-3 top-9 flex items-center gap-1 text-[9px] font-extrabold text-amber-600/85">
-                    <AlertTriangle className="h-3 w-3 shrink-0" /> Check
-                  </span>
-                )}
-              </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Field: Designation */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                              Designation / Title
+                            </label>
+                            {renderVerificationBadge('designation')}
+                          </div>
+                          <Input
+                            type="text"
+                            value={formFields.designation}
+                            onChange={(e) => setFormFields({ ...formFields, designation: e.target.value })}
+                            className={getFieldClass('designation')}
+                          />
+                          {renderEnhancementMeta('designation')}
+                        </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Field: Email */}
-                <div className="relative">
-                  <Input
-                    label="Email"
-                    type="email"
-                    value={formFields.email}
-                    onChange={(e) => setFormFields({ ...formFields, email: e.target.value })}
-                  />
-                  {!formFields.email && (
-                    <span className="absolute right-3 top-9 flex items-center gap-1 text-[9px] font-extrabold text-amber-600/85">
-                      <AlertTriangle className="h-3 w-3 shrink-0" /> Check
-                    </span>
-                  )}
+                        {/* Field: Department */}
+                        {(formFields.department || isEnhanced) && (
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                                Department
+                              </label>
+                              {renderVerificationBadge('department')}
+                            </div>
+                            <Input
+                              type="text"
+                              value={formFields.department}
+                              onChange={(e) => setFormFields({ ...formFields, department: e.target.value })}
+                              className={getFieldClass('department')}
+                            />
+                            {renderEnhancementMeta('department')}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Field: Email */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                              Email
+                            </label>
+                            {renderVerificationBadge('email')}
+                          </div>
+                          <Input
+                            type="email"
+                            value={formFields.email}
+                            onChange={(e) => setFormFields({ ...formFields, email: e.target.value })}
+                            className={getFieldClass('email')}
+                          />
+                          {renderEnhancementMeta('email')}
+                        </div>
+
+                        {/* Field: Phone */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                              Phone
+                            </label>
+                            {renderVerificationBadge('phone')}
+                          </div>
+                          <Input
+                            type="text"
+                            value={formFields.phone}
+                            onChange={(e) => setFormFields({ ...formFields, phone: e.target.value })}
+                            className={getFieldClass('phone')}
+                          />
+                          {renderEnhancementMeta('phone')}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Field: Website */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                              Website
+                            </label>
+                            {renderVerificationBadge('website')}
+                          </div>
+                          <Input
+                            type="text"
+                            value={formFields.website}
+                            onChange={(e) => setFormFields({ ...formFields, website: e.target.value })}
+                            className={getFieldClass('website')}
+                          />
+                          {renderEnhancementMeta('website')}
+                        </div>
+
+                        {/* Field: LinkedIn URL */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                              LinkedIn Profile URL
+                            </label>
+                            {renderVerificationBadge('linkedInUrl')}
+                          </div>
+                          <Input
+                            type="text"
+                            value={formFields.linkedInUrl}
+                            onChange={(e) => setFormFields({ ...formFields, linkedInUrl: e.target.value })}
+                            className={getFieldClass('linkedInUrl')}
+                          />
+                          {renderEnhancementMeta('linkedInUrl')}
+                        </div>
+                      </div>
+
+                      {/* Field: Address */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="sm:col-span-2">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                              Address
+                            </label>
+                            {renderVerificationBadge('address')}
+                          </div>
+                          <Input
+                            type="text"
+                            value={formFields.address}
+                            onChange={(e) => setFormFields({ ...formFields, address: e.target.value })}
+                            className={getFieldClass('address')}
+                          />
+                          {renderEnhancementMeta('address')}
+                        </div>
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                              Postal Code
+                            </label>
+                            {renderVerificationBadge('postalCode')}
+                          </div>
+                          <Input
+                            type="text"
+                            value={formFields.postalCode}
+                            onChange={(e) => setFormFields({ ...formFields, postalCode: e.target.value })}
+                            className={getFieldClass('postalCode')}
+                          />
+                          {renderEnhancementMeta('postalCode')}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Field: Industry */}
+                        {(formFields.industry || isEnhanced) && (
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                                Industry
+                              </label>
+                              {renderVerificationBadge('industry')}
+                            </div>
+                            <Input
+                              type="text"
+                              value={formFields.industry}
+                              onChange={(e) => setFormFields({ ...formFields, industry: e.target.value })}
+                              className={getFieldClass('industry')}
+                            />
+                            {renderEnhancementMeta('industry')}
+                          </div>
+                        )}
+
+                        {/* Field: Skills */}
+                        {(formFields.skills || isEnhanced) && (
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                                Skills (Comma Separated)
+                              </label>
+                              {renderVerificationBadge('skills')}
+                            </div>
+                            <Input
+                              type="text"
+                              value={formFields.skills}
+                              onChange={(e) => setFormFields({ ...formFields, skills: e.target.value })}
+                              className={getFieldClass('skills')}
+                            />
+                            {renderEnhancementMeta('skills')}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Field: Professional Summary */}
+                      {(formFields.professionalSummary || isEnhanced) && (
+                        <div className="w-full flex flex-col gap-1.5 mb-4">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                              Professional Summary
+                            </label>
+                            {renderVerificationBadge('professionalSummary')}
+                          </div>
+                          <textarea
+                            rows={3}
+                            value={formFields.professionalSummary}
+                            onChange={(e) => setFormFields({ ...formFields, professionalSummary: e.target.value })}
+                            className={`w-full px-3.5 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none transition-all duration-150 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 ${getFieldClass('professionalSummary')}`}
+                          />
+                          {renderEnhancementMeta('professionalSummary')}
+                        </div>
+                      )}
+
+                      {/* Experience Highlights */}
+                      {formFields.experience && formFields.experience.length > 0 && (
+                        <div className="w-full flex flex-col gap-1.5 mb-4 p-3 bg-slate-50/50 border border-slate-100 rounded-lg">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-xs font-bold text-slate-500 tracking-wide uppercase">
+                              Experience History
+                            </label>
+                            {renderVerificationBadge('experience')}
+                          </div>
+                          <div className="space-y-1.5 mt-1">
+                            {formFields.experience.map((exp: any, idx: number) => (
+                              <div key={idx} className="text-xs">
+                                <span className="font-bold text-slate-700">{exp.title}</span> at <span className="font-semibold text-slate-600">{exp.company}</span> <span className="text-slate-400">({exp.period})</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Education Highlights */}
+                      {formFields.education && formFields.education.length > 0 && (
+                        <div className="w-full flex flex-col gap-1.5 mb-4 p-3 bg-slate-50/50 border border-slate-100 rounded-lg">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-xs font-bold text-slate-500 tracking-wide uppercase">
+                              Education
+                            </label>
+                            {renderVerificationBadge('education')}
+                          </div>
+                          <div className="space-y-1 mt-1">
+                            {formFields.education.map((edu: any, idx: number) => (
+                              <div key={idx} className="text-xs">
+                                <span className="font-bold text-slate-700">{edu.school}</span> - <span className="text-slate-600">{edu.degree}</span> <span className="text-slate-400">({edu.year})</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4 border-t border-slate-100">
+                  <Button
+                    type="button"
+                    onClick={handleDeleteCard}
+                    variant="outline"
+                    className="flex-1 py-2 text-xs"
+                  >
+                    Discard
+                  </Button>
+                  <Button
+                    type="submit"
+                    isLoading={updateContactMutation.isPending}
+                    disabled={!formFields.name}
+                    className="flex-1 py-2 text-xs font-bold"
+                  >
+                    Confirm & Save Contact
+                  </Button>
                 </div>
-
-                {/* Field: Phone */}
-                <div className="relative">
-                  <Input
-                    label="Phone"
-                    type="text"
-                    value={formFields.phone}
-                    onChange={(e) => setFormFields({ ...formFields, phone: e.target.value })}
-                  />
-                  {!formFields.phone && (
-                    <span className="absolute right-3 top-9 flex items-center gap-1 text-[9px] font-extrabold text-amber-600/85">
-                      <AlertTriangle className="h-3 w-3 shrink-0" /> Check
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Field: Website */}
-                <div>
-                  <Input
-                    label="Website"
-                    type="text"
-                    value={formFields.website}
-                    onChange={(e) => setFormFields({ ...formFields, website: e.target.value })}
-                  />
-                </div>
-
-                {/* Field: LinkedIn URL */}
-                <div>
-                  <Input
-                    label="LinkedIn Profile URL"
-                    type="text"
-                    value={formFields.linkedInUrl}
-                    onChange={(e) => setFormFields({ ...formFields, linkedInUrl: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              {/* Field: Address */}
-              <div>
-                <Input
-                  label="Address"
-                  type="text"
-                  value={formFields.address}
-                  onChange={(e) => setFormFields({ ...formFields, address: e.target.value })}
-                />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-4 border-t border-slate-100">
-                <Button
-                  type="button"
-                  onClick={handleDeleteCard}
-                  variant="outline"
-                  className="flex-1 py-2 text-xs"
-                >
-                  Discard
-                </Button>
-                <Button
-                  type="submit"
-                  isLoading={updateContactMutation.isPending}
-                  disabled={!formFields.name}
-                  className="flex-1 py-2 text-xs font-bold"
-                >
-                  Confirm & Save Contact
-                </Button>
-              </div>
             </form>
           </div>
         </div>

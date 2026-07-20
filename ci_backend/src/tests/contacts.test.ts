@@ -84,9 +84,49 @@ describe('Contacts Duplicate Analysis & Similarity Scorer', () => {
     const duplicates = await contactsService.detectDuplicates('user-1', 'contact-1');
 
     expect(duplicates.length).toBe(2);
-    expect(duplicates[0].duplicateScore).toBeGreaterThanOrEqual(75); // 60 (email) + 15 (company)
+    expect(duplicates[0].duplicateScore).toBeGreaterThanOrEqual(75); // 65 (email) + company sim
     expect(duplicates[0].reasons).toContain('Exact email match');
-    expect(duplicates[1].duplicateScore).toBe(50); // phone match
+    expect(duplicates[1].duplicateScore).toBe(55); // upgraded phone match score
     expect(duplicates[1].reasons).toContain('Exact phone match');
+  });
+
+  test('createContact should merge fields into existing contact if a duplicate is found', async () => {
+    const mockContact = {
+      id: 'contact-existing',
+      name: 'Jegadhees Jambulingam',
+      email: 'jegadhees@example.com',
+      phone: '+15551234567',
+      company: 'Enterprise Inc',
+      website: 'enterprise.io',
+      skills: ['TypeScript'],
+      interests: [],
+      hobbies: [],
+      linkedInProfile: {
+        linkedInUrl: 'https://linkedin.com/in/jegadhees',
+      },
+    };
+
+    (prisma.contact.findFirst as jest.Mock).mockResolvedValue(mockContact);
+    (prisma.contact.findMany as jest.Mock).mockResolvedValue([mockContact]);
+
+    // Mock prisma.contact.update
+    (prisma.contact.update as any) = jest.fn().mockResolvedValue({
+      ...mockContact,
+      skills: ['TypeScript', 'Go'],
+      designation: 'Principal Engineer',
+    });
+
+    const inputData = {
+      name: 'Jegadhees Jambulingam',
+      email: 'jegadhees@example.com',
+      company: 'Enterprise Inc',
+      designation: 'Principal Engineer',
+      skills: ['Go'],
+    };
+
+    const result = await contactsService.createContact('user-1', inputData);
+
+    expect(prisma.contact.update).toHaveBeenCalled();
+    expect(result.id).toBe('contact-existing');
   });
 });

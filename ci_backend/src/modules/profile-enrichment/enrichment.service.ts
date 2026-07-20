@@ -3,6 +3,8 @@ import prisma from '../../config/db';
 import { AppError } from '../../utils/AppError';
 import Redis from 'ioredis';
 import { connectionOptions } from '../../queue/queue';
+import linkedinService from '../linkedin/linkedin.service';
+import logger from '../../config/logger';
 
 // Resilient cache layers
 let redisClient: Redis | null = null;
@@ -116,8 +118,24 @@ export class ProfileEnrichmentService {
       return cachedData;
     }
 
+    let linkedInDetails: any = null;
+    try {
+      logger.info(`[Business Intelligence Agent] Searching LinkedIn for: ${name} (Company: ${company})`);
+      const searchResults = await linkedinService.searchProfiles(name, company || undefined);
+      if (searchResults && searchResults.length > 0) {
+        const bestMatch = searchResults[0];
+        logger.info(`[Business Intelligence Agent] LinkedIn match found: ${bestMatch.fullName} - ${bestMatch.salesNavigatorId}`);
+        linkedInDetails = await linkedinService.getProfileDetails(bestMatch.salesNavigatorId);
+      }
+    } catch (err: any) {
+      logger.warn(`[Business Intelligence Agent] LinkedIn provider search/details failed: ${err.message}. Proceeding to Gemini fallback.`);
+    }
+
     const apiKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
     if (!apiKey) {
+      if (linkedInDetails) {
+        return this.mapLinkedInToEnriched(linkedInDetails, name, email, company, 0.9);
+      }
       return this.getFallbackData(name, email, company);
     }
 
@@ -125,71 +143,111 @@ export class ProfileEnrichmentService {
       const { GoogleGenerativeAI } = require('@google/generative-ai');
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-1.5-pro',
         tools: [{ googleSearch: {} }],
       });
 
-      const prompt = `Search the web using Google Search to enrich the professional profile of the following person:
+      const linkedInContext = linkedInDetails ? JSON.stringify(linkedInDetails) : 'None';
+
+      const prompt = `You are a strict Business Intelligence Agent.
+Enrich the professional details of the following contact using Google Search grounding and provided context.
 Name: ${name}
-${email ? `Email: ${email}` : ''}
-${company ? `Company: ${company}` : ''}
+Email: ${email || 'Unknown'}
+Company: ${company || 'Unknown'}
 
-Find their public profiles (e.g. GitHub, personal blog, speaker profiles, papers) and extract:
-1. Skills (string array)
-2. Experience (array of objects with fields: title, company, period)
-3. Education (array of objects with fields: school, degree, year)
-4. Certifications (string array)
-5. Public Projects & Achievements (string array)
-6. Industry (string)
-7. Technologies (string array)
-8. Interests (string array)
-9. Public Social Links (array of objects with fields: platform, url)
+Existing LinkedIn Context:
+${linkedInContext}
 
-Important Grounding Guidelines: Do not hallucinate or invent any information. If you cannot find details about their skills, experience, or education, return empty arrays/null for those fields. If you cannot identify the industry, return "Professional Services". Add a confidence score (number between 0.0 and 1.0) under a "confidenceScore" field indicating how reliable the retrieved details are based on matching confidence.
+Instructions:
+1. Synthesize all available information to create a comprehensive professional profile.
+2. Only summarize VERIFIED information. Never invent or hallucinate.
+3. Compute a confidence score (number between 0.0 and 1.0) and include the verification source.
+4. Output ONLY a valid raw JSON object matching the following format exactly:
+{
+  "summary": "Professional summary (2-3 sentences). Example: John Doe is a Senior Cloud Architect with 14 years... Previously worked at...",
+  "insights": "1-2 sentences on professional insights (e.g. Technical Expert, Decision Maker, Founder).",
+  "conversationStarters": ["I noticed you recently worked on Generative AI...", "Saw your article on..."],
+  "skills": ["Skill 1", "Skill 2"],
+  "experience": [{"title": "Title", "company": "Company", "period": "2020-Present"}],
+  "education": [{"school": "School", "degree": "Degree", "year": "Year"}],
+  "interests": ["Interest 1"],
+  "industry": "Industry or null",
+  "designation": "Job Title or null",
+  "company": "Current Company or null",
+  "publicProfiles": [{"platform": "LinkedIn", "url": "URL"}],
+  "verificationStatus": "Verified via LinkedIn & Google Search",
+  "confidenceScore": 0.95
+}
 
-Return ONLY a valid raw JSON object matching these fields. Do not include markdown code block formatting, backticks, or any conversational text. Ensure all string lists are populated correctly.`;
+Do not include markdown code block formatting, backticks, or any conversational text.`;
 
       const response = await model.generateContent(prompt);
       const text = response.response.text();
-      
       const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(cleaned);
-      
-      // Normalize values to prevent schema errors
+
+      const finalProfiles = parsed.publicProfiles || [];
+      if (linkedInDetails?.profileUrl) {
+        if (!finalProfiles.some((p: any) => p.platform?.toLowerCase() === 'linkedin')) {
+          finalProfiles.unshift({ platform: 'LinkedIn', url: linkedInDetails.profileUrl });
+        }
+      }
+
       return {
-        name: parsed.name || name,
-        email: parsed.email || email || '',
+        name: name,
+        email: email || '',
         company: parsed.company || company || '',
-        skills: Array.isArray(parsed.skills) ? parsed.skills : [],
-        experience: Array.isArray(parsed.experience) ? parsed.experience : [],
-        education: Array.isArray(parsed.education) ? parsed.education : [],
+        designation: parsed.designation || linkedInDetails?.designation || null,
+        skills: Array.isArray(parsed.skills) && parsed.skills.length > 0 ? parsed.skills : (linkedInDetails?.skills || []),
+        experience: Array.isArray(parsed.experience) && parsed.experience.length > 0 ? parsed.experience : (linkedInDetails?.experience || []),
+        education: Array.isArray(parsed.education) && parsed.education.length > 0 ? parsed.education : (linkedInDetails?.education || []),
         interests: Array.isArray(parsed.interests) ? parsed.interests : [],
-        industry: parsed.industry || 'Professional Services',
-        publicProfiles: Array.isArray(parsed.publicProfiles) ? parsed.publicProfiles : (
-          Array.isArray(parsed.publicSocialLinks) ? parsed.publicSocialLinks.map((l: any) => ({
-            platform: l.platform || 'Social',
-            url: l.url || ''
-          })) : [
-            { platform: 'LinkedIn', url: `https://linkedin.com/in/${name.toLowerCase().replace(/\s+/g, '')}` }
-          ]
-        ),
-        confidenceScore: typeof parsed.confidenceScore === 'number' ? parsed.confidenceScore : 0.5,
+        industry: parsed.industry || linkedInDetails?.headline || 'Professional Services',
+        publicProfiles: finalProfiles,
+        confidenceScore: typeof parsed.confidenceScore === 'number' ? parsed.confidenceScore : 0.8,
+        summary: parsed.summary || linkedInDetails?.summary || null,
+        insights: parsed.insights || null,
+        conversationStarters: Array.isArray(parsed.conversationStarters) ? parsed.conversationStarters : [],
+        verificationStatus: parsed.verificationStatus || (linkedInDetails ? "Verified via LinkedIn" : "Verified via General Search"),
       };
     };
 
     try {
-      // Execute with timeout and retry mechanisms
       const enrichedResult = await retryWithBackoff(() => 
-        withTimeout(runEnrichment(), 15000, 'Gemini search grounding timed out after 15 seconds')
+        withTimeout(runEnrichment(), 25000, 'Gemini search grounding enrichment timed out')
       );
 
-      // Save to cache
       await setCachedEnrichment(cacheKey, enrichedResult);
       return enrichedResult;
     } catch (err) {
-      console.warn(`[Profile Enrichment] AI search grounding failed, falling back gracefully:`, err);
+      console.warn(`[Business Intelligence Agent] AI search grounding failed, falling back to LinkedIn or default:`, err);
+      if (linkedInDetails) {
+        return this.mapLinkedInToEnriched(linkedInDetails, name, email, company, 0.75);
+      }
       return this.getFallbackData(name, email, company);
     }
+  }
+
+  private mapLinkedInToEnriched(ld: any, name: string, email: string | null, company: string | null, confidence: number) {
+    return {
+      name,
+      email: email || '',
+      company: company || ld.company || '',
+      designation: ld.designation || null,
+      skills: ld.skills || [],
+      experience: ld.experience || [],
+      education: ld.education || [],
+      interests: [],
+      industry: ld.headline || 'Professional Services',
+      publicProfiles: [
+        { platform: 'LinkedIn', url: ld.profileUrl }
+      ],
+      confidenceScore: confidence,
+      summary: ld.summary || null,
+      insights: null,
+      conversationStarters: [],
+      verificationStatus: "Verified via LinkedIn",
+    };
   }
 
   private getFallbackData(name: string, email: string | null, company: string | null) {
@@ -211,6 +269,10 @@ Return ONLY a valid raw JSON object matching these fields. Do not include markdo
         { platform: 'GitHub', url: `https://github.com/${name.toLowerCase().replace(/\s+/g, '')}` },
       ],
       confidenceScore: 0.8,
+      summary: 'Professional expert with experience in software development and technology solutions.',
+      insights: 'Technical Leader',
+      conversationStarters: ['I noticed you have a background in System Architecture.'],
+      verificationStatus: "Fallback Local Heuristics",
     };
   }
 }

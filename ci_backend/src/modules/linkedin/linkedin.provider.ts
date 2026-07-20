@@ -206,18 +206,26 @@ export class PublicInfoLinkedInProvider implements ILinkedInProvider {
 Name: ${name}
 ${company ? `Company: ${company}` : ''}
 
-Find up to 3 candidate profiles. For each profile, retrieve:
+CRITICAL INSTRUCTIONS:
+- You must find actual search results.
+- DO NOT invent, guess, or hallucinate profiles.
+- If you cannot find a highly confident match on LinkedIn, return an empty array: []
+
+If you do find a real profile, return a JSON array with up to 3 candidate profiles. For each, retrieve:
 1. Full Name (fullName)
 2. Current Company (company)
 3. Designation / Title (designation)
-4. LinkedIn URL (linkedInUrl)
-5. A profile image URL if available (profileImage)
+4. LinkedIn URL (linkedInUrl) - MUST BE A REAL URL
+5. profileImage
 
 Construct a salesNavigatorId for each profile using the format 'pub-<name-slug>-<company-slug>'.
-Return ONLY a valid raw JSON array of objects with fields: salesNavigatorId, fullName, company, designation, linkedInUrl, profileImage.
-Do not include markdown code block formatting, backticks, or any conversational text.`;
+Return ONLY a valid raw JSON array of objects.
+Do not include markdown code block formatting or backticks.`;
 
-      const response = await model.generateContent(prompt);
+      // Prevent indefinite hanging
+      const responsePromise = model.generateContent(prompt);
+      const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Gemini timeout")), 15000));
+      const response = await Promise.race([responsePromise, timeoutPromise]) as any;
       const text = response.response.text();
       const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
@@ -276,7 +284,12 @@ Do not include markdown code block formatting, backticks, or any conversational 
       const prompt = `Search the web using Google Search to get the detailed professional history for this person/profile reference:
 Profile Reference: ${profileId}
 
-Retrieve:
+CRITICAL INSTRUCTIONS:
+- DO NOT hallucinate, invent, or guess details.
+- If you cannot verify the person's exact work history (company, title, period) or education (school, degree, year) from actual search results, return empty arrays for experience and education.
+- Do not make up URLs.
+
+Retrieve ONLY verified information for:
 1. Full Name (fullName)
 2. Current Company (company)
 3. Designation / Title (designation)
@@ -284,15 +297,18 @@ Retrieve:
 5. headline (headline)
 6. location (location)
 7. summary (summary)
-8. Structured profile data (profileData) containing:
+8. Structured profile data containing:
    - skills (string array)
    - experience (array of objects with fields: title, company, period)
    - education (array of objects with fields: school, degree, year)
 
 Return ONLY a valid JSON object matching these fields, with salesNavigatorId set to '${profileId}'.
-Do not include markdown code block formatting, backticks, or any conversational text.`;
+Do not include markdown code block formatting or conversational text.`;
 
-      const response = await model.generateContent(prompt);
+      // Prevent indefinite hanging
+      const responsePromise = model.generateContent(prompt);
+      const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Gemini timeout")), 20000));
+      const response = await Promise.race([responsePromise, timeoutPromise]) as any;
       const text = response.response.text();
       const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
 

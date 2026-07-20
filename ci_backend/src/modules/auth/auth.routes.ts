@@ -30,7 +30,6 @@ const controller = new AuthController();
  *               - fullName
  *               - email
  *               - password
- *               - organization
  *             properties:
  *               fullName:
  *                 type: string
@@ -45,6 +44,7 @@ const controller = new AuthController();
  *                 example: securePassword123
  *               organization:
  *                 type: string
+ *                 description: Optional. Defaults to Individual when omitted.
  *                 example: Acme Corp
  *               role:
  *                 type: string

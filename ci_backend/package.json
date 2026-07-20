@@ -45,6 +45,7 @@
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.6",
     "jest": "^30.4.2",
+    "jest-mock": "^30.4.1",
     "prisma": "^5.12.1",
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.11",

@@ -91,7 +91,10 @@ export const DashboardPage: React.FC = () => {
       {/* Metrics Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Contacts */}
-        <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs flex items-center justify-between">
+        <button 
+          onClick={() => navigate('/contacts')}
+          className="bg-white p-5 border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/10 rounded-xl shadow-xs flex items-center justify-between transition-all outline-none text-left w-full cursor-pointer"
+        >
           <div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
               Total Contacts
@@ -103,7 +106,7 @@ export const DashboardPage: React.FC = () => {
           <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-indigo-600">
             <Users className="h-6 w-6" />
           </div>
-        </div>
+        </button>
 
         {/* OCR Success Rate */}
         <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs flex items-center justify-between">

@@ -1,5 +1,5 @@
 import { Worker, Job } from 'bullmq';
-import { connectionOptions } from '../queue/queue';
+import { connectionOptions, enrichmentQueue, aiSummaryQueue } from '../queue/queue';
 import prisma from '../config/db';
 import logger from '../config/logger';
 import { JobStatus, ContactSource } from '@prisma/client';
@@ -11,11 +11,14 @@ import { ProfileEnrichmentService, calculateDecisionMakerScore } from '../module
 import { AiSummaryService } from '../modules/ai-summary/ai-summary.service';
 import { FaceRecognitionService } from '../modules/face-recognition/face.service';
 import { parseContactString } from '../utils/vcardParser';
+import { validateAndCorrectContact, runGeminiOcrClassifier } from '../utils/validationEngine';
+import { ContactsService } from '../modules/contacts/contacts.service';
 
 const execFilePromise = promisify(execFile);
 const enrichmentService = new ProfileEnrichmentService();
 const aiSummaryService = new AiSummaryService();
 const faceService = new FaceRecognitionService();
+const contactsService = new ContactsService();
 
 // 1. OCR Processing Worker
 export const ocrWorker = new Worker(
@@ -75,6 +78,10 @@ export const ocrWorker = new Worker(
         linkedin_url: qrFields.linkedin_url || ocrFields.linkedin_url || null,
       };
 
+      // Call validation engine
+      const validation = await runGeminiOcrClassifier(result.ocr_text, mergedFields);
+      const validatedFields = validation.fields;
+
       // Complete OCR and save data
       const updatedCard = await prisma.businessCard.update({
         where: { id: businessCardId },
@@ -84,37 +91,28 @@ export const ocrWorker = new Worker(
             rawOcrText: result.ocr_text,
             qrPresent: result.qr_present,
             qrData: result.qr_data,
-            fields: mergedFields,
+            fields: validatedFields as any,
+            understanding: validation.understanding as any,
+            needsManualReview: validation.needsManualReview,
           },
         },
       });
 
-      // If contactId is associated, update details. Otherwise, create a new contact profile!
-      const ocrScore = calculateDecisionMakerScore(mergedFields.designation || '');
+      const userId = businessCard.uploadedFile.userId;
+      let activeContactId: string;
 
+      // If contactId is associated, update details. Otherwise, create or merge into a contact profile!
       if (updatedCard.contactId) {
-        await prisma.contact.update({
-          where: { id: updatedCard.contactId },
-          data: {
-            name: mergedFields.name,
-            company: mergedFields.company,
-            designation: mergedFields.designation,
-            email: mergedFields.email,
-            phone: mergedFields.phone,
-            website: mergedFields.website,
-            address: mergedFields.address,
-            source: result.qr_present ? ContactSource.QR : ContactSource.BUSINESS_CARD,
-            decisionMakerScore: ocrScore,
-          },
-        });
+        activeContactId = updatedCard.contactId;
+        await contactsService.mergeFieldsIntoContact(userId, activeContactId, validatedFields);
 
         // Write audit log / timeline
         await prisma.auditLog.create({
           data: {
-            userId: businessCard.uploadedFile.userId,
+            userId,
             action: 'OCR_PROCESSING_COMPLETED',
             entity: 'Contact',
-            entityId: updatedCard.contactId,
+            entityId: activeContactId,
             details: {
               processingTimeMs: Date.now() - startTime,
               qrCodeUsed: result.qr_present,
@@ -122,45 +120,89 @@ export const ocrWorker = new Worker(
           },
         }).catch(() => {});
       } else {
-        const newContact = await prisma.contact.create({
-          data: {
-            userId: businessCard.uploadedFile.userId,
-            name: mergedFields.name,
-            company: mergedFields.company,
-            designation: mergedFields.designation,
-            email: mergedFields.email,
-            phone: mergedFields.phone,
-            website: mergedFields.website,
-            address: mergedFields.address,
-            source: result.qr_present ? ContactSource.QR : ContactSource.BUSINESS_CARD,
-            decisionMakerScore: ocrScore,
-          },
-        });
+        // Check for duplicates
+        const duplicate = await contactsService.findDuplicateContact(userId, validatedFields);
+        if (duplicate) {
+          logger.info(`[OCR Job] Found duplicate contact ${duplicate.id} for card ${businessCardId}. Merging...`);
+          activeContactId = duplicate.id;
+          await contactsService.mergeFieldsIntoContact(userId, activeContactId, validatedFields);
 
-        // Update card and uploaded file to link to this new contact
-        await prisma.businessCard.update({
-          where: { id: businessCardId },
-          data: { contactId: newContact.id },
-        });
+          // Update card and uploaded file to link to this duplicate contact
+          await prisma.businessCard.update({
+            where: { id: businessCardId },
+            data: { contactId: activeContactId },
+          });
 
-        await prisma.uploadedFile.update({
-          where: { id: businessCard.uploadedFileId },
-          data: { contactId: newContact.id },
-        });
+          await prisma.uploadedFile.update({
+            where: { id: businessCard.uploadedFileId },
+            data: { contactId: activeContactId },
+          });
 
-        // Write audit log / timeline
-        await prisma.auditLog.create({
-          data: {
-            userId: businessCard.uploadedFile.userId,
-            action: 'CONTACT_CREATED_FROM_OCR',
-            entity: 'Contact',
-            entityId: newContact.id,
-            details: {
-              processingTimeMs: Date.now() - startTime,
-              qrCodeUsed: result.qr_present,
+          // Write audit log / timeline
+          await prisma.auditLog.create({
+            data: {
+              userId,
+              action: 'CONTACT_MERGED_FROM_OCR',
+              entity: 'Contact',
+              entityId: activeContactId,
+              details: {
+                processingTimeMs: Date.now() - startTime,
+                qrCodeUsed: result.qr_present,
+                duplicateMatched: true,
+              },
             },
-          },
-        }).catch(() => {});
+          }).catch(() => {});
+        } else {
+          // Create new contact profile
+          const ocrScore = calculateDecisionMakerScore(validatedFields.designation || '');
+          const newContact = await prisma.contact.create({
+            data: {
+              userId,
+              name: validatedFields.name || 'Unknown Contact',
+              company: validatedFields.company,
+              designation: validatedFields.designation,
+              email: validatedFields.email,
+              phone: validatedFields.phone,
+              website: validatedFields.website,
+              address: validatedFields.address,
+              source: result.qr_present ? ContactSource.QR : ContactSource.BUSINESS_CARD,
+              decisionMakerScore: ocrScore,
+            },
+          });
+
+          activeContactId = newContact.id;
+
+          // Update card and uploaded file to link to this new contact
+          await prisma.businessCard.update({
+            where: { id: businessCardId },
+            data: { contactId: activeContactId },
+          });
+
+          await prisma.uploadedFile.update({
+            where: { id: businessCard.uploadedFileId },
+            data: { contactId: activeContactId },
+          });
+
+          // Write audit log / timeline
+          await prisma.auditLog.create({
+            data: {
+              userId,
+              action: 'CONTACT_CREATED_FROM_OCR',
+              entity: 'Contact',
+              entityId: activeContactId,
+              details: {
+                processingTimeMs: Date.now() - startTime,
+                qrCodeUsed: result.qr_present,
+              },
+            },
+          }).catch(() => {});
+        }
+      }
+
+      // If low confidence, apply needs-manual-review tag
+      if (validation.needsManualReview) {
+        logger.info(`[OCR Job] Tagging contact ${activeContactId} as needs-manual-review`);
+        await contactsService.addTags(userId, activeContactId, ['needs-manual-review']).catch(() => {});
       }
 
       logger.info(`[OCR Job] Successfully completed business card: ${businessCardId} in ${Date.now() - startTime}ms`);

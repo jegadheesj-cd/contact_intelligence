@@ -3,9 +3,134 @@ import { AppError } from '../../utils/AppError';
 import { enrichmentQueue, aiSummaryQueue } from '../../queue/queue';
 import { ContactSource, Prisma } from '@prisma/client';
 import { calculateDecisionMakerScore } from '../profile-enrichment/enrichment.service';
+import logger from '../../config/logger';
 
 export class ContactsService {
+  public async findDuplicateContact(userId: string, data: any): Promise<any | null> {
+    const email = data.email?.toLowerCase().trim();
+    const phoneDigits = data.phone?.replace(/\D/g, '') || data.mobile?.replace(/\D/g, '') || data.office?.replace(/\D/g, '');
+    const linkedin = data.linkedin_url?.toLowerCase().trim() || data.linkedinUrl?.toLowerCase().trim();
+    const name = data.name;
+    const company = data.company;
+
+    // Get all contacts of this user
+    const contacts = await prisma.contact.findMany({
+      where: { userId },
+      include: {
+        linkedInProfile: true,
+      },
+    });
+
+    for (const c of contacts) {
+      // 1. Email check
+      if (email && c.email && c.email.toLowerCase().trim() === email) {
+        return c;
+      }
+      // 2. Phone check
+      if (phoneDigits && phoneDigits.length >= 7) {
+        const cPhoneDigits = c.phone?.replace(/\D/g, '');
+        if (cPhoneDigits && cPhoneDigits === phoneDigits) {
+          return c;
+        }
+      }
+      // 3. LinkedIn check
+      if (linkedin) {
+        const cLinkedin = c.linkedInProfile?.linkedInUrl?.toLowerCase().trim();
+        if (cLinkedin && cLinkedin === linkedin) {
+          return c;
+        }
+      }
+      // 4. Name + Company check
+      if (name && company && c.company) {
+        const nameSim = this.calculateSimilarity(name, c.name);
+        const companySim = this.calculateSimilarity(company, c.company);
+        if (nameSim >= 0.8 && companySim >= 0.8) {
+          return c;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  public async mergeFieldsIntoContact(userId: string, contactId: string, fields: any) {
+    const contact = await this.getContactById(userId, contactId);
+
+    const chooseBestField = (val1: string | null, val2: string | null) => {
+      if (!val1) return val2;
+      if (!val2) return val1;
+      return val1.length >= val2.length ? val1 : val2;
+    };
+
+    const mergedData: any = {
+      name: chooseBestField(contact.name, fields.name) || contact.name,
+      company: chooseBestField(contact.company, fields.company),
+      designation: chooseBestField(contact.designation, fields.designation),
+      email: chooseBestField(contact.email, fields.email),
+      phone: chooseBestField(contact.phone, fields.phone),
+      website: chooseBestField(contact.website, fields.website),
+      address: chooseBestField(contact.address, fields.address),
+      industry: chooseBestField(contact.industry, fields.industry),
+    };
+
+    if (fields.skills && Array.isArray(fields.skills)) {
+      mergedData.skills = Array.from(new Set([...(contact.skills || []), ...fields.skills]));
+    }
+    if (fields.interests && Array.isArray(fields.interests)) {
+      mergedData.interests = Array.from(new Set([...(contact.interests || []), ...fields.interests]));
+    }
+
+    // Re-evaluate decision score
+    if (mergedData.designation) {
+      mergedData.decisionMakerScore = calculateDecisionMakerScore(mergedData.designation);
+    }
+
+    return await prisma.contact.update({
+      where: { id: contactId },
+      data: mergedData,
+      include: {
+        tags: true,
+        notes: true,
+        linkedInProfile: true,
+        aiSummary: true,
+      },
+    });
+  }
+
   public async createContact(userId: string, data: any) {
+    // 1. Check if duplicate exists
+    const duplicate = await this.findDuplicateContact(userId, data);
+    if (duplicate) {
+      logger.info(`[Contacts Service] Duplicate contact found (${duplicate.id}). Merging details...`);
+      // Merge new fields into duplicate
+      const merged = await this.mergeFieldsIntoContact(userId, duplicate.id, data);
+      
+      // If there are tags, add them
+      if (data.tags && Array.isArray(data.tags)) {
+        await this.addTags(userId, duplicate.id, data.tags);
+      }
+      // If there are notes, add them
+      if (data.notes) {
+        await this.addNote(userId, duplicate.id, data.notes);
+      }
+      // If there is linkedInUrl, update it
+      if (data.linkedInUrl && !duplicate.linkedInProfile?.linkedInUrl) {
+        await prisma.linkedInProfile.upsert({
+          where: { contactId: duplicate.id },
+          create: {
+            contactId: duplicate.id,
+            linkedInUrl: data.linkedInUrl,
+            salesNavigatorId: data.salesNavigatorId || null,
+          },
+          update: {
+            linkedInUrl: data.linkedInUrl,
+            salesNavigatorId: data.salesNavigatorId || null,
+          },
+        });
+      }
+      return this.getContactById(userId, duplicate.id);
+    }
+
     const { tags, notes, linkedInUrl, salesNavigatorId, ...contactData } = data;
     const score = calculateDecisionMakerScore(contactData.designation || '');
 
@@ -52,22 +177,8 @@ export class ContactsService {
       },
     });
 
-    // Trigger Background Queue Jobs for Enrichment and AI Summary
-    if (contact.linkedInProfile) {
-      await enrichmentQueue.add(
-        'enrich-profile',
-        { contactId: contact.id, profileId: contact.linkedInProfile.id },
-        { attempts: 3, backoff: { type: 'exponential', delay: 5000 } }
-      );
-    }
-
-    if (contact.aiSummary) {
-      await aiSummaryQueue.add(
-        'generate-summary',
-        { contactId: contact.id, aiSummaryId: contact.aiSummary.id },
-        { attempts: 3, backoff: { type: 'exponential', delay: 5000 } }
-      );
-    }
+    // Note: Enrichment and AI Summary are now explicitly triggered via the Business Intelligence Phase.
+    // They are no longer automatically queued on contact creation.
 
     return contact;
   }
@@ -231,7 +342,7 @@ export class ContactsService {
   }
 
   // Duplicate Contact Detection Logic
-  private calculateSimilarity(str1: string, str2: string): number {
+  public calculateSimilarity(str1: string, str2: string): number {
     const s1 = (str1 || '').toLowerCase().trim();
     const s2 = (str2 || '').toLowerCase().trim();
     if (!s1 || !s2) return 0.0;
@@ -276,40 +387,63 @@ export class ContactsService {
       let score = 0;
       const reasons = [];
 
-      // 1. Email exact match
+      // 1. Email exact match (highest signal - unique identifier)
       if (contact.email && other.email && contact.email.toLowerCase().trim() === other.email.toLowerCase().trim()) {
-        score += 60;
+        score += 65;
         reasons.push('Exact email match');
       }
 
-      // 2. Phone exact match
-      if (contact.phone && other.phone && contact.phone.replace(/\D/g, '') === other.phone.replace(/\D/g, '')) {
-        score += 50;
-        reasons.push('Exact phone match');
-      }
-
-      // 3. Name similarity
-      const nameSim = this.calculateSimilarity(contact.name, other.name);
-      if (nameSim > 0.8) {
-        score += 35;
-        reasons.push(`High name similarity (${Math.round(nameSim * 100)}%)`);
-      } else if (nameSim > 0.6) {
-        score += 15;
-        reasons.push(`Moderate name similarity (${Math.round(nameSim * 100)}%)`);
-      }
-
-      // 4. Company similarity
-      if (contact.company && other.company) {
-        const companySim = this.calculateSimilarity(contact.company, other.company);
-        if (companySim > 0.8) {
-          score += 15;
-          reasons.push('Similar company name');
+      // 2. Phone exact match (digits only comparison, handles formatting differences)
+      if (contact.phone && other.phone) {
+        const contactDigits = contact.phone.replace(/\D/g, '');
+        const otherDigits = other.phone.replace(/\D/g, '');
+        // Match last 10 digits to handle country code variations
+        if (contactDigits.length >= 7 && otherDigits.length >= 7) {
+          const contactSuffix = contactDigits.slice(-10);
+          const otherSuffix = otherDigits.slice(-10);
+          if (contactSuffix === otherSuffix) {
+            score += 55;
+            reasons.push('Exact phone match');
+          }
         }
       }
 
-      // 5. Website match
+      // 3. LinkedIn URL exact match (very strong unique identifier)
+      const contactLinkedIn = (contact as any).linkedInProfile?.linkedInUrl?.toLowerCase().trim();
+      const otherLinkedIn = (other as any).linkedInProfile?.linkedInUrl?.toLowerCase().trim();
+      if (contactLinkedIn && otherLinkedIn && contactLinkedIn === otherLinkedIn) {
+        score += 70;
+        reasons.push('Exact LinkedIn URL match');
+      }
+
+      // 4. Name similarity (weighted)
+      const nameSim = this.calculateSimilarity(contact.name, other.name);
+      if (nameSim >= 0.9) {
+        score += 40;
+        reasons.push(`Very high name similarity (${Math.round(nameSim * 100)}%)`);
+      } else if (nameSim > 0.8) {
+        score += 28;
+        reasons.push(`High name similarity (${Math.round(nameSim * 100)}%)`);
+      } else if (nameSim > 0.65) {
+        score += 12;
+        reasons.push(`Moderate name similarity (${Math.round(nameSim * 100)}%)`);
+      }
+
+      // 5. Company similarity (supporting signal)
+      if (contact.company && other.company) {
+        const companySim = this.calculateSimilarity(contact.company, other.company);
+        if (companySim >= 0.85) {
+          score += 18;
+          reasons.push('Similar company name');
+        } else if (companySim >= 0.70) {
+          score += 8;
+          reasons.push('Partial company name match');
+        }
+      }
+
+      // 6. Website exact match (supporting signal)
       if (contact.website && other.website && contact.website.toLowerCase().trim() === other.website.toLowerCase().trim()) {
-        score += 10;
+        score += 12;
         reasons.push('Exact website match');
       }
 
@@ -318,9 +452,9 @@ export class ContactsService {
 
       if (finalScore >= 40) {
         let recommendation = 'Manual review recommended';
-        if (finalScore >= 80) {
+        if (finalScore >= 85) {
           recommendation = 'Strongly recommended to merge (highly probable duplicate)';
-        } else if (finalScore >= 60) {
+        } else if (finalScore >= 65) {
           recommendation = 'Recommended to merge (likely duplicate)';
         }
 
