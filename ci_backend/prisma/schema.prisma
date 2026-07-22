@@ -23,7 +23,11 @@ enum ContactSource {
 
 enum JobStatus {
   PENDING
+  QUEUED
   PROCESSING
+  FETCHING_PROFILE
+  VERIFYING
+  GENERATING_SUMMARY
   COMPLETED
   FAILED
 }
@@ -71,7 +75,7 @@ model Contact {
   tags               Tag[]              @relation("ContactTags")
   notes              Note[]
   businessCards      BusinessCard[]
-  linkedInProfile    LinkedInProfile?
+  professionalProfile ProfessionalProfile?
   aiSummary          AISummary?
   faceRecognitions   FaceRecognition[]
   nfcData            NFCData[]
@@ -147,18 +151,24 @@ model Note {
   @@map("notes")
 }
 
-model LinkedInProfile {
-  id               String    @id @default(uuid())
-  contactId        String    @unique
-  contact          Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  salesNavigatorId String?
-  linkedInUrl      String?
-  profileData      Json?
-  enrichmentStatus JobStatus @default(PENDING)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+model ProfessionalProfile {
+  id                 String    @id @default(uuid())
+  contactId          String    @unique
+  contact            Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  
+  providerResponses  Json?     // Array of raw responses from providers
+  mergedProfile      Json?     // The final merged profile object
+  sourceAttribution  Json?     // The mapping of fields to sources and confidences
+  
+  verificationConfidence Float?
+  verificationStatus     String?
+  providersUsed          String[]  @default([])
+  
+  enrichmentStatus   JobStatus @default(PENDING)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  @@map("linkedin_profiles")
+  @@map("professional_profiles")
 }
 
 model AISummary {

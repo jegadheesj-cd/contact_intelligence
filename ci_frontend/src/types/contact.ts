@@ -13,13 +13,16 @@ export interface Note {
   updatedAt: string;
 }
 
-export interface LinkedInProfile {
+export interface ProfessionalProfile {
   id: string;
   contactId: string;
-  enrichmentStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
-  salesNavigatorId?: string | null;
-  linkedInUrl?: string | null;
-  profileData?: any;
+  providerResponses?: any;
+  mergedProfile?: any;
+  sourceAttribution?: any;
+  verificationConfidence?: number;
+  verificationStatus?: string;
+  providersUsed: string[];
+  enrichmentStatus: 'PENDING' | 'QUEUED' | 'PROCESSING' | 'FETCHING_PROFILE' | 'VERIFYING' | 'GENERATING_SUMMARY' | 'COMPLETED' | 'FAILED';
   createdAt: string;
   updatedAt: string;
 }
@@ -55,7 +58,7 @@ export interface Contact {
   updatedAt: string;
   tags?: Tag[];
   notes?: Note[];
-  linkedInProfile?: LinkedInProfile | null;
+  professionalProfile?: ProfessionalProfile | null;
   aiSummary?: AiSummary | null;
 }
 

@@ -226,9 +226,15 @@ def parse_contact_fields(text_lines):
 
     website = None
     if email:
-        # Primary strategy: derive website from email domain (most reliable)
+        # A personal-mail domain is not a company website. Only infer a website
+        # from a corporate email domain when the card did not contain one.
         email_domain = email.split('@')[-1].lower()
         email_domain_stem = email_domain.split('.')[0]  # e.g. "infosys"
+        personal_email_domains = {
+            'gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.co.in',
+            'outlook.com', 'hotmail.com', 'live.com', 'icloud.com',
+            'proton.me', 'protonmail.com', 'zoho.com'
+        }
         # Check if any detected website explicitly matches the email domain
         confirmed_from_ocr = None
         for w in websites:
@@ -236,9 +242,10 @@ def parse_contact_fields(text_lines):
             if email_domain in w_host or email_domain_stem in w_host:
                 confirmed_from_ocr = w
                 break
-        # Prefer OCR-confirmed URL (e.g. picks up 'https://infosys.com/...' if present)
-        # otherwise fall back to the email domain
-        website = confirmed_from_ocr if confirmed_from_ocr else f"www.{email_domain}"
+        # Prefer a URL explicitly present on the card. Infer only corporate domains.
+        website = confirmed_from_ocr if confirmed_from_ocr else (
+            None if email_domain in personal_email_domains else f"www.{email_domain}"
+        )
     elif websites:
         # No email available: pick a credible-looking detected website
         trusted_tlds = {
@@ -263,7 +270,8 @@ def parse_contact_fields(text_lines):
         'company', 'group', 'ventures', 'technologies', 'solutions', 'systems',
         'consulting', 'developers', 'labs', 'studios', 'creative', 'agency',
         'firm', 'enterprises', 'industries', 'services', 'partners', 'associates',
-        'capital', 'global', 'networks', 'digital', 'media', 'international'
+        'capital', 'global', 'networks', 'digital', 'media', 'international',
+        'destinations'
     ]
     all_company_keywords = strong_company_suffixes + soft_company_keywords
 

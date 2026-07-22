@@ -92,14 +92,28 @@ export class DashboardService {
     const recentlyEnriched = await prisma.contact.findMany({
       where: {
         userId,
-        linkedInProfile: {
+        professionalProfile: {
           enrichmentStatus: 'COMPLETED',
         },
       },
       orderBy: { updatedAt: 'desc' },
       take: 5,
-      include: { linkedInProfile: true },
+      include: { professionalProfile: true },
     });
+
+    // 9. Verification rate and AI Insights coverage
+    const totalProfiles = await prisma.professionalProfile.count({
+      where: { contact: { userId } }
+    });
+    const verifiedProfiles = await prisma.professionalProfile.count({
+      where: { contact: { userId }, verificationStatus: 'Verified' }
+    });
+    const verificationRate = totalProfiles > 0 ? Math.round((verifiedProfiles / totalProfiles) * 100) : 0;
+
+    const contactsWithSummary = await prisma.contact.count({
+      where: { userId, aiSummary: { isNot: null } }
+    });
+    const aiSummaryCoverage = totalContacts > 0 ? Math.round((contactsWithSummary / totalContacts) * 100) : 0;
 
     return {
       totalContacts,
@@ -110,6 +124,8 @@ export class DashboardService {
       commonIndustries: commonIndustries.map((i) => ({ industry: i.industry, count: i._count.industry })),
       commonSkills,
       recentlyEnriched,
+      verificationRate,
+      aiSummaryCoverage,
     };
   }
 

@@ -14,7 +14,6 @@ import {
   AlertTriangle,
   ArrowRight,
   ShieldCheck,
-  Cpu,
   Trash2,
 } from 'lucide-react';
 
@@ -378,23 +377,79 @@ export const ScannerPage: React.FC = () => {
       )}
 
       {/* STEP 3: Polling OCR processing status */}
-      {step === 'processing' && (
-        <div className="bg-white border border-slate-100 rounded-2xl p-12 text-center flex flex-col items-center justify-center shadow-xs min-h-[350px]">
-          <div className="relative mb-6">
-            <div className="h-16 w-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin" />
-            <Cpu className="absolute inset-0 m-auto h-6 w-6 text-indigo-500 animate-pulse" />
+      {/* STEP 3: Polling OCR processing status */}
+      {step === 'processing' && (() => {
+        const ocrStatus = card?.ocrStatus || 'PENDING';
+        const profileStatus = card?.contact?.professionalProfile?.enrichmentStatus;
+
+        // Steps mapping
+        const isOcrActive = ocrStatus === 'PENDING' || ocrStatus === 'PROCESSING';
+        const isOcrDone = ocrStatus === 'COMPLETED';
+        
+        const isVerifActive = isOcrDone && (!profileStatus || profileStatus === 'PENDING' || profileStatus === 'QUEUED');
+        const isVerifDone = isOcrDone && profileStatus && profileStatus !== 'PENDING' && profileStatus !== 'QUEUED';
+
+        const isBuildActive = isOcrDone && profileStatus && ['PROCESSING', 'FETCHING_PROFILE', 'VERIFYING', 'GENERATING_SUMMARY'].includes(profileStatus);
+        const isBuildDone = profileStatus === 'COMPLETED';
+
+        const steps = [
+          { label: 'Uploading Business Card Image', status: 'completed' },
+          { label: 'OCR Engine Parsing & Extraction', status: isOcrDone ? 'completed' : (isOcrActive ? 'active' : 'pending') },
+          { label: 'Verification Engine Signal Analysis', status: isVerifDone ? 'completed' : (isVerifActive ? 'active' : 'pending') },
+          { label: 'OSINT Search & Profile Enrichment', status: isBuildDone ? 'completed' : (isBuildActive ? 'active' : 'pending') },
+          { label: 'Finalizing Contact Summary', status: isBuildDone ? 'completed' : 'pending' }
+        ];
+
+        // Trigger automatic redirect when completed
+        if (isBuildDone && card?.contact?.id) {
+          setTimeout(() => {
+            navigate(`/contacts/${card.contact?.id}`);
+          }, 1500);
+        }
+
+        return (
+          <div className="bg-white border border-slate-100 rounded-2xl p-10 flex flex-col md:flex-row items-center gap-10 shadow-lg min-h-[400px] max-w-4xl mx-auto animate-slide-down">
+            <div className="flex-1 flex flex-col items-center text-center md:text-left md:items-start">
+              <span className="text-[10px] font-black tracking-widest text-indigo-500 uppercase">Real-Time Ingestion</span>
+              <h2 className="text-2xl font-black text-slate-800 mt-2">Processing Contact</h2>
+              <p className="text-xs text-slate-400 mt-2 max-w-sm leading-relaxed">
+                We are parsing your business card and performing real-time public searches to construct a comprehensive profile.
+              </p>
+              
+              <div className="mt-8 flex gap-3">
+                <Button onClick={handleDeleteCard} variant="outline" className="text-xs py-2 px-4 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200">
+                  Cancel Processing
+                </Button>
+              </div>
+            </div>
+
+            <div className="w-full md:w-96 flex flex-col gap-5 border-l border-slate-100 pl-0 md:pl-8">
+              {steps.map((s, idx) => (
+                <div key={idx} className="flex items-center gap-4">
+                  {s.status === 'completed' && (
+                    <div className="h-6 w-6 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
+                      ✓
+                    </div>
+                  )}
+                  {s.status === 'active' && (
+                    <div className="h-6 w-6 rounded-full bg-indigo-50 border border-indigo-200 flex items-center justify-center shrink-0">
+                      <div className="h-2.5 w-2.5 bg-indigo-600 rounded-full animate-ping" />
+                    </div>
+                  )}
+                  {s.status === 'pending' && (
+                    <div className="h-6 w-6 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300 text-xs font-bold shrink-0">
+                      {idx + 1}
+                    </div>
+                  )}
+                  <span className={`text-xs font-bold ${s.status === 'active' ? 'text-slate-800' : (s.status === 'completed' ? 'text-emerald-700 font-semibold' : 'text-slate-400')}`}>
+                    {s.label}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-          <h2 className="text-lg font-bold text-slate-800">OCR Engine Active</h2>
-          <p className="text-xs text-slate-400 mt-1 max-w-xs leading-relaxed">
-            Parsing text fields, verifying hashes, and checking embedded vCard QR codes. This takes roughly 5-10 seconds...
-          </p>
-          <div className="mt-8 flex gap-3">
-            <Button onClick={handleDeleteCard} variant="outline" className="text-xs py-1.5 px-3 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200">
-              Cancel & Delete
-            </Button>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* STEP 4: Review OCR Output side-by-side */}
       {step === 'review' && (

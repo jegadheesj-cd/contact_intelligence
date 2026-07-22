@@ -39,36 +39,5 @@ const controller = new ProfileEnrichmentController();
  */
 router.post('/trigger', authenticateJWT, controller.trigger);
 
-/**
- * @openapi
- * /api/profile-enrichment/instant:
- *   post:
- *     summary: Instantly search and enrich a person online (synchronous API)
- *     tags: [Profile Enrichment]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - name
- *             properties:
- *               name:
- *                 type: string
- *                 example: Jane Doe
- *               email:
- *                 type: string
- *                 example: jane.doe@company.com
- *               company:
- *                 type: string
- *                 example: Google
- *     responses:
- *       200:
- *         description: Professional profile details returned instantly
- */
-router.post('/instant', authenticateJWT, controller.instant);
 
 export default router;

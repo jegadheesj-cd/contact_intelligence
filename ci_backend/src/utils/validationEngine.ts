@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import logger from '../config/logger';
+import { generateTextWithFallback } from './aiClient';
 
 export interface StructuredContact {
   name: string;
@@ -248,17 +249,13 @@ export async function validateAndCorrectContact(
   // 1. Run local rules-based cross validation first
   const baseFields = crossValidateFields(initialFields);
   
-  const apiKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    logger.warn('[Validation Engine] API Key missing, returning local heuristic results.');
+    logger.warn('[Validation Engine] No LLM API Key (Groq or Gemini) found, returning local heuristic results.');
     return buildFallbackResult(baseFields);
   }
 
   try {
-    const { GoogleGenerativeAI } = require('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
-
     const prompt = `You are a strict Contact Understanding Agent.
 Your ONLY responsibility is to extract, classify, and validate information that EXACTLY exists in the provided raw OCR text.
 
@@ -303,8 +300,7 @@ Example Output:
 
 Return ONLY the JSON array. Do not include markdown formatting or backticks.`;
 
-    const response = await model.generateContent(prompt);
-    const responseText = response.response.text().trim();
+    const responseText = await generateTextWithFallback(prompt, 'gemini-1.5-pro', 'OCR Validation');
     const cleanedJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
     const parsedArray = JSON.parse(cleanedJson) as ContactUnderstandingField[];
 

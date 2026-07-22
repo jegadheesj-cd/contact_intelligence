@@ -49,7 +49,8 @@ export interface DashboardWidgets {
   commonCompanies: CommonCompany[];
   commonIndustries: CommonIndustry[];
   commonSkills: CommonSkill[];
-  recentlyEnriched: any[];
+  verificationRate?: number;
+  aiSummaryCoverage?: number;
 }
 
 export interface QueueCount {

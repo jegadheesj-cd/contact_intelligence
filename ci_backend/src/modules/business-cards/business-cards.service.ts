@@ -64,7 +64,12 @@ export class BusinessCardsService {
       },
       include: {
         uploadedFile: true,
-        contact: true,
+        contact: {
+          include: {
+            professionalProfile: true,
+            aiSummary: true,
+          }
+        },
       },
     });
 

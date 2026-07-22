@@ -17,7 +17,7 @@ export class ContactsService {
     const contacts = await prisma.contact.findMany({
       where: { userId },
       include: {
-        linkedInProfile: true,
+        professionalProfile: true,
       },
     });
 
@@ -35,7 +35,7 @@ export class ContactsService {
       }
       // 3. LinkedIn check
       if (linkedin) {
-        const cLinkedin = c.linkedInProfile?.linkedInUrl?.toLowerCase().trim();
+        const cLinkedin = (c as any).professionalProfile?.linkedInUrl?.toLowerCase().trim() || (c as any).professionalProfile?.mergedProfile?.profileUrl?.toLowerCase().trim();
         if (cLinkedin && cLinkedin === linkedin) {
           return c;
         }
@@ -91,7 +91,7 @@ export class ContactsService {
       include: {
         tags: true,
         notes: true,
-        linkedInProfile: true,
+        professionalProfile: true,
         aiSummary: true,
       },
     });
@@ -114,17 +114,13 @@ export class ContactsService {
         await this.addNote(userId, duplicate.id, data.notes);
       }
       // If there is linkedInUrl, update it
-      if (data.linkedInUrl && !duplicate.linkedInProfile?.linkedInUrl) {
-        await prisma.linkedInProfile.upsert({
+      if (data.linkedInUrl && !(duplicate as any).professionalProfile?.mergedProfile?.profileUrl) {
+        await prisma.professionalProfile.upsert({
           where: { contactId: duplicate.id },
           create: {
             contactId: duplicate.id,
-            linkedInUrl: data.linkedInUrl,
-            salesNavigatorId: data.salesNavigatorId || null,
           },
           update: {
-            linkedInUrl: data.linkedInUrl,
-            salesNavigatorId: data.salesNavigatorId || null,
           },
         });
       }
@@ -155,12 +151,9 @@ export class ContactsService {
             },
           },
         } : {}),
-        // Optional LinkedIn Profile
-        linkedInProfile: {
-          create: {
-            linkedInUrl: linkedInUrl || null,
-            salesNavigatorId: salesNavigatorId || null,
-          },
+        // Optional Professional Profile
+        professionalProfile: {
+          create: {},
         },
         // Optional AI Summary Placeholder
         aiSummary: {
@@ -172,7 +165,7 @@ export class ContactsService {
       include: {
         tags: true,
         notes: true,
-        linkedInProfile: true,
+        professionalProfile: true,
         aiSummary: true,
       },
     });
@@ -189,7 +182,7 @@ export class ContactsService {
       include: {
         tags: true,
         notes: true,
-        linkedInProfile: true,
+        professionalProfile: true,
         aiSummary: true,
         businessCards: true,
         nfcData: true,
@@ -232,7 +225,7 @@ export class ContactsService {
       include: {
         tags: true,
         notes: true,
-        linkedInProfile: true,
+        professionalProfile: true,
         aiSummary: true,
       },
     });
@@ -323,7 +316,7 @@ export class ContactsService {
         include: {
           tags: true,
           notes: true,
-          linkedInProfile: true,
+          professionalProfile: true,
           aiSummary: true,
         },
       }),
@@ -409,8 +402,8 @@ export class ContactsService {
       }
 
       // 3. LinkedIn URL exact match (very strong unique identifier)
-      const contactLinkedIn = (contact as any).linkedInProfile?.linkedInUrl?.toLowerCase().trim();
-      const otherLinkedIn = (other as any).linkedInProfile?.linkedInUrl?.toLowerCase().trim();
+      const contactLinkedIn = (contact as any).professionalProfile?.mergedProfile?.profileUrl?.toLowerCase().trim();
+      const otherLinkedIn = (other as any).professionalProfile?.mergedProfile?.profileUrl?.toLowerCase().trim();
       if (contactLinkedIn && otherLinkedIn && contactLinkedIn === otherLinkedIn) {
         score += 70;
         reasons.push('Exact LinkedIn URL match');

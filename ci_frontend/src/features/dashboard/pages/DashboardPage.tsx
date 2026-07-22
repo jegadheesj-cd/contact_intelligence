@@ -89,7 +89,7 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* Metrics Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {/* Total Contacts */}
         <button 
           onClick={() => navigate('/contacts')}
@@ -99,14 +99,44 @@ export const DashboardPage: React.FC = () => {
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
               Total Contacts
             </span>
-            <h3 className="text-3xl font-extrabold text-slate-900 mt-2">
+            <h3 className="text-2xl font-extrabold text-slate-900 mt-2">
               {widgets?.totalContacts || 0}
             </h3>
           </div>
-          <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-indigo-600">
-            <Users className="h-6 w-6" />
+          <div className="p-2.5 bg-indigo-50 border border-indigo-100 rounded-lg text-indigo-600">
+            <Users className="h-5 w-5" />
           </div>
         </button>
+
+        {/* Verification Success Rate */}
+        <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+              Verified Contacts
+            </span>
+            <h3 className="text-2xl font-extrabold text-slate-900 mt-2">
+              {widgets?.verificationRate !== undefined ? `${widgets.verificationRate}%` : '0%'}
+            </h3>
+          </div>
+          <div className="p-2.5 bg-violet-50 border border-violet-100 rounded-lg text-violet-600">
+            <UserCheck className="h-5 w-5" />
+          </div>
+        </div>
+
+        {/* AI Summary Coverage */}
+        <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+              AI Summary Coverage
+            </span>
+            <h3 className="text-2xl font-extrabold text-slate-900 mt-2">
+              {widgets?.aiSummaryCoverage !== undefined ? `${widgets.aiSummaryCoverage}%` : '0%'}
+            </h3>
+          </div>
+          <div className="p-2.5 bg-purple-50 border border-purple-100 rounded-lg text-purple-600">
+            <Activity className="h-5 w-5" />
+          </div>
+        </div>
 
         {/* OCR Success Rate */}
         <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs flex items-center justify-between">
@@ -114,12 +144,12 @@ export const DashboardPage: React.FC = () => {
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
               OCR Success Rate
             </span>
-            <h3 className="text-3xl font-extrabold text-slate-900 mt-2">
+            <h3 className="text-2xl font-extrabold text-slate-900 mt-2">
               {ocrRate.toFixed(0)}%
             </h3>
           </div>
-          <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg text-emerald-600">
-            <Zap className="h-6 w-6" />
+          <div className="p-2.5 bg-emerald-50 border border-emerald-100 rounded-lg text-emerald-600">
+            <Zap className="h-5 w-5" />
           </div>
         </div>
 
@@ -129,12 +159,12 @@ export const DashboardPage: React.FC = () => {
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
               Face Similarity
             </span>
-            <h3 className="text-3xl font-extrabold text-slate-900 mt-2">
-              {matchAccuracy > 0 ? `${(matchAccuracy * 100).toFixed(0)}%` : '0.00'}
+            <h3 className="text-2xl font-extrabold text-slate-900 mt-2">
+              {matchAccuracy > 0 ? `${(matchAccuracy * 100).toFixed(0)}%` : '0%'}
             </h3>
           </div>
-          <div className="p-3 bg-sky-50 border border-sky-100 rounded-lg text-sky-600">
-            <UserCheck className="h-6 w-6" />
+          <div className="p-2.5 bg-sky-50 border border-sky-100 rounded-lg text-sky-600">
+            <UserCheck className="h-5 w-5" />
           </div>
         </div>
 
@@ -144,12 +174,12 @@ export const DashboardPage: React.FC = () => {
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
               Avg OCR Speed
             </span>
-            <h3 className="text-3xl font-extrabold text-slate-900 mt-2">
+            <h3 className="text-2xl font-extrabold text-slate-900 mt-2">
               {avgOcrTime > 0 ? `${(avgOcrTime / 1000).toFixed(1)}s` : '0.0s'}
             </h3>
           </div>
-          <div className="p-3 bg-rose-50 border border-rose-100 rounded-lg text-rose-600">
-            <Clock className="h-6 w-6" />
+          <div className="p-2.5 bg-rose-50 border border-rose-100 rounded-lg text-rose-600">
+            <Clock className="h-5 w-5" />
           </div>
         </div>
       </div>

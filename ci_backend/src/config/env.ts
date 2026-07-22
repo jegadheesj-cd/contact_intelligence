@@ -18,10 +18,12 @@ const envSchema = z.object({
   RATE_LIMIT_WINDOW_MS: z.preprocess((val) => Number(val), z.number().default(900000)),
   RATE_LIMIT_MAX: z.preprocess((val) => Number(val), z.number().default(100)),
   UPLOAD_DIR: z.string().default('./uploads'),
-  RAPIDAPI_KEY: z.string().optional(),
-  RAPIDAPI_HOST: z.string().default('fresh-linkedin-profile-data.p.rapidapi.com'),
-  LINKEDIN_PROVIDER: z.enum(['rapidapi', 'gemini']).default('rapidapi'),
-  LINKEDIN_CACHE_TTL: z.preprocess((val) => Number(val || 86400), z.number().default(86400)),
+  BRAVE_SEARCH_API_KEY: z.string().optional(),
+  GOOGLE_SEARCH_CX: z.string().optional(),
+  GOOGLE_SEARCH_API_KEY: z.string().optional(),
+  BING_SEARCH_API_KEY: z.string().optional(),
+  TAVILY_API_KEY: z.string().optional(),
+  SEARCH_PROVIDER: z.enum(['brave', 'google_custom', 'bing', 'tavily', 'fallback']).default('fallback'),
 });
 
 const parseResult = envSchema.safeParse(process.env);

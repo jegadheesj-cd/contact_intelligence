@@ -101,8 +101,10 @@ describe('Contacts Duplicate Analysis & Similarity Scorer', () => {
       skills: ['TypeScript'],
       interests: [],
       hobbies: [],
-      linkedInProfile: {
-        linkedInUrl: 'https://linkedin.com/in/jegadhees',
+      professionalProfile: {
+        mergedProfile: {
+          profileUrl: 'https://linkedin.com/in/jegadhees',
+        }
       },
     };
 

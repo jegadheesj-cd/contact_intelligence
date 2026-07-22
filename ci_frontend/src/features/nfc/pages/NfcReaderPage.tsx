@@ -79,7 +79,7 @@ export const NfcReaderPage: React.FC = () => {
             phone: contact.phone || '',
             website: contact.website || '',
             address: contact.address || '',
-            linkedInUrl: contact.linkedInProfile?.linkedInUrl || contact.website || '',
+            linkedInUrl: contact.professionalProfile?.mergedProfile?.profileUrl || contact.website || '',
           });
           setStep('review');
           addToast('NFC Tag successfully scanned and processed.', 'success');
@@ -129,7 +129,7 @@ export const NfcReaderPage: React.FC = () => {
         phone: contact.phone || '',
         website: contact.website || '',
         address: contact.address || '',
-        linkedInUrl: contact.linkedInProfile?.linkedInUrl || contact.website || '',
+        linkedInUrl: contact.professionalProfile?.mergedProfile?.profileUrl || contact.website || '',
       });
       setStep('review');
       addToast('Simulated NFC tag tapped successfully.', 'success');

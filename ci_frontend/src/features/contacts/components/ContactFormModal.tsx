@@ -52,7 +52,7 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
           phone: contact.phone || '',
           website: contact.website || '',
           address: contact.address || '',
-          linkedInUrl: contact.linkedInProfile?.linkedInUrl || contact.website || '',
+          linkedInUrl: contact.professionalProfile?.mergedProfile?.profileUrl || contact.website || '',
           skills: contact.skills ? contact.skills.join(', ') : '',
           tags: contact.tags ? contact.tags.map((t) => t.name).join(', ') : '',
         });

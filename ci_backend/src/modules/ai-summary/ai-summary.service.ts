@@ -1,6 +1,8 @@
 import prisma from '../../config/db';
 import { AppError } from '../../utils/AppError';
 import { JobStatus } from '@prisma/client';
+import logger from '../../config/logger';
+import { generateTextWithFallback } from '../../utils/aiClient';
 
 // Timeout helper
 function withTimeout<T>(promise: Promise<T>, ms: number, errorMessage = 'AI summary generation timed out'): Promise<T> {
@@ -31,6 +33,7 @@ export class AiSummaryService {
       include: {
         tags: true,
         notes: true,
+        professionalProfile: true
       },
     });
 
@@ -38,63 +41,81 @@ export class AiSummaryService {
       throw new AppError('Contact not found or access denied', 404);
     }
 
-    const apiKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
-    let summaryText = '';
+    const apiKey = process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new AppError('API key missing for AI Summary Generation', 500);
+    }
+
+    // Pass strictly verified profile data mapped to flat values
+    let verifiedProfile: any = null;
+    if (contact.professionalProfile?.mergedProfile) {
+      const merged = contact.professionalProfile.mergedProfile as any;
+      const flat: any = {};
+      for (const [key, val] of Object.entries(merged)) {
+        if (val && typeof val === 'object' && 'value' in val) {
+          flat[key] = (val as any).value;
+        } else {
+          flat[key] = val;
+        }
+      }
+      verifiedProfile = flat;
+    }
 
     const executeLlmGeneration = async () => {
-      const { GoogleGenerativeAI } = require('@google/generative-ai');
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
       const notesContent = contact.notes.map(n => n.content).join('; ');
       const tagsList = contact.tags.map(t => t.name).join(', ');
 
-      const prompt = `Compile a professional summary for the following contact profile:
+      const prompt = `You are a strict Professional Analyst and Executive Assistant.
+Your task is to analyze the following profile data and extract key insights.
+You must ONLY use the provided input. Do NOT invent, guess, or hallucinate information. If the information is not present in the input, leave it empty or omit it.
+
+INPUT DATA:
 Name: ${contact.name}
 Company: ${contact.company || 'Unknown'}
-Designation: ${contact.designation || 'Professional'}
-Skills: ${contact.skills.join(', ') || 'Various'}
-Source: ${contact.source}
+Designation: ${contact.designation || 'Unknown'}
+Contact Source: ${contact.source}
 Tags: ${tagsList || 'None'}
 Meeting Notes: ${notesContent || 'None'}
+Profile Data (JSON):
+${verifiedProfile ? JSON.stringify(verifiedProfile) : 'No profile data available.'}
 
-Please formulate a highly polished professional analysis. Output ONLY a valid raw JSON object matching the following keys:
+Output ONLY a valid JSON object matching this exact format:
 {
-  "summary": "A concise professional background summary (2-3 sentences) in a polished tone.",
-  "collaborationAlignment": "1-2 sentences on how to best align or collaborate with this person based on notes/tags/skills.",
-  "keyStrengths": ["Strength 1", "Strength 2", "Strength 3"]
+  "executiveSummary": "A concise professional background summary (2-3 sentences).",
+  "careerHighlights": ["Highlight 1", "Highlight 2"],
+  "conversationStarters": ["Starter Idea 1", "Starter Idea 2"],
+  "meetingPreparation": "A brief overview preparing for a meeting with them.",
+  "professionalStrengths": ["Strength 1", "Strength 2"],
+  "networkingSuggestions": "Suggestions on how to build a professional relationship with them.",
+  "decisionMakerExplanation": "Explanation of why they are or are not a decision maker based on designation/role."
 }
+Do not include markdown blocks or any conversational text.`;
 
-Do not include markdown code block formatting, backticks, or any conversational text.`;
-
-      const response = await model.generateContent(prompt);
-      const text = response.response.text().trim();
+      const text = await generateTextWithFallback(prompt, 'gemini-2.0-flash', 'AI Summary');
       
       const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(cleaned);
       
-      if (!parsed.summary || !parsed.collaborationAlignment) {
-        throw new Error('Invalid JSON structure returned by AI model.');
-      }
-
-      // Combine structured JSON values into a premium paragraph summary
-      const strengthsText = Array.isArray(parsed.keyStrengths) && parsed.keyStrengths.length > 0
-        ? ` Key Strengths: ${parsed.keyStrengths.join(', ')}.`
-        : '';
-      return `${parsed.summary} Alignment: ${parsed.collaborationAlignment}.${strengthsText}`;
+      return JSON.stringify(parsed);
     };
 
-    if (!apiKey) {
-      summaryText = this.getFallbackSummary(contact);
-    } else {
-      try {
-        summaryText = await retryWithBackoff(() => 
-          withTimeout(executeLlmGeneration(), 10000, 'AI summary generation timed out after 10 seconds')
-        );
-      } catch (err) {
-        console.warn('[AI Summary] Gemini API error, falling back to local heuristic parser:', err);
-        summaryText = this.getFallbackSummary(contact);
-      }
+    let summaryText = '';
+    try {
+      summaryText = await retryWithBackoff(() => 
+        withTimeout(executeLlmGeneration(), 15000, 'AI summary generation timed out')
+      );
+    } catch (err: any) {
+      logger.error(`[AI Summary] LLM generation failed:`);
+      logger.error(err.stack || err.message);
+      summaryText = JSON.stringify({
+        executiveSummary: 'AI generation failed due to API rate limits or quota exhaustion.',
+        professionalHighlights: [],
+        careerSummary: 'Failed to generate career progression summary due to API limitations.',
+        decisionMakerExplanation: 'Unable to analyze decision-making tier.',
+        conversationStarters: [],
+        networkingSuggestions: 'No suggestions available at this time.',
+        professionalStrengths: []
+      });
     }
 
     // Save/update summary record
@@ -112,12 +133,5 @@ Do not include markdown code block formatting, backticks, or any conversational 
     });
 
     return summaryRecord;
-  }
-
-  private getFallbackSummary(contact: any): string {
-    const skillsList = contact.skills.length > 0 ? contact.skills.join(', ') : 'various fields';
-    const companyText = contact.company ? `working with ${contact.company}` : 'independent professional';
-    const designationText = contact.designation || 'Expert';
-    return `[AI Summary] ${contact.name} is a ${designationText} ${companyText}. Their key competency domains span across ${skillsList}. Recorded via ${contact.source}. Recommendations: Highly suitable contact for potential executive collaboration (Decision Maker Score: ${contact.decisionMakerScore}/100).`;
   }
 }

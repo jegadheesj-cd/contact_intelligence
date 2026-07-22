@@ -11,7 +11,7 @@ async function main() {
   await prisma.nFCData.deleteMany({});
   await prisma.faceRecognition.deleteMany({});
   await prisma.aISummary.deleteMany({});
-  await prisma.linkedInProfile.deleteMany({});
+  await prisma.professionalProfile.deleteMany({});
   await prisma.note.deleteMany({});
   await prisma.businessCard.deleteMany({});
   await prisma.uploadedFile.deleteMany({});
@@ -90,12 +90,11 @@ async function main() {
           userId: user.id,
         },
       },
-      linkedInProfile: {
+      professionalProfile: {
         create: {
-          salesNavigatorId: 'sn-alice-johnson-1100',
-          linkedInUrl: 'https://linkedin.com/in/alice-johnson-fv',
-          enrichmentStatus: JobStatus.COMPLETED,
-        },
+          verificationStatus: 'Pending',
+          enrichmentStatus: 'PENDING',
+        }
       },
       aiSummary: {
         create: {

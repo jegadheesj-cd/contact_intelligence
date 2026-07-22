@@ -30,6 +30,7 @@ import {
   ExternalLink,
   Award,
   Info,
+  Loader2,
 } from 'lucide-react';
 
 export const ContactDetailPage: React.FC = () => {
@@ -58,8 +59,8 @@ export const ContactDetailPage: React.FC = () => {
   // Monitor enrichment status to toggle polling loop
   useEffect(() => {
     if (contact) {
-      const status = contact.linkedInProfile?.enrichmentStatus;
-      if (status === 'PENDING' || status === 'IN_PROGRESS') {
+      const status = contact.professionalProfile?.enrichmentStatus;
+      if (status && ['PENDING', 'QUEUED', 'PROCESSING', 'FETCHING_PROFILE', 'VERIFYING', 'GENERATING_SUMMARY'].includes(status)) {
         setIsEnrichmentActive(true);
       } else {
         setIsEnrichmentActive(false);
@@ -177,8 +178,51 @@ export const ContactDetailPage: React.FC = () => {
     .substring(0, 2)
     .toUpperCase();
 
-  const enrichmentStatus = contact.linkedInProfile?.enrichmentStatus || 'PENDING';
-  const aiProfile = contact.linkedInProfile?.profileData;
+  const enrichmentStatus = contact.professionalProfile?.enrichmentStatus || 'PENDING';
+  const rawProfile = contact.professionalProfile?.mergedProfile as any;
+  const flatProfile: any = {};
+  if (rawProfile) {
+    for (const [key, val] of Object.entries(rawProfile)) {
+      if (val && typeof val === 'object' && 'value' in (val as any)) {
+        flatProfile[key] = (val as any).value;
+      } else {
+        flatProfile[key] = val;
+      }
+    }
+  }
+  const aiProfile = rawProfile ? flatProfile : null;
+  const verificationStatus = contact.professionalProfile?.verificationStatus;
+  const verificationConfidence = contact.professionalProfile?.verificationConfidence;
+
+  let aiParsedSummary: any = null;
+  try {
+    if (contact.aiSummary?.summaryText) {
+      aiParsedSummary = JSON.parse(contact.aiSummary.summaryText);
+    }
+  } catch (e) {
+    aiParsedSummary = { executiveSummary: contact.aiSummary?.summaryText };
+  }
+
+  const isPipelineActive = ['QUEUED', 'PROCESSING', 'FETCHING_PROFILE', 'VERIFYING', 'GENERATING_SUMMARY'].includes(enrichmentStatus);
+
+  const renderBadge = (fieldName: string) => {
+    if (!rawProfile || !rawProfile[fieldName]) return null;
+    const fieldObj = rawProfile[fieldName];
+    if (!fieldObj || !fieldObj.source || fieldObj.source === 'None') return null;
+
+    return (
+      <span 
+        className={`inline-flex items-center gap-1.5 ml-2.5 px-2 py-0.5 rounded-full text-[9px] font-black tracking-wide border shadow-sm
+          ${fieldObj.verification === 'Verified' 
+            ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+            : 'bg-slate-50 text-slate-500 border-slate-200'}`}
+        title={`Source: ${fieldObj.source} | Confidence: ${fieldObj.confidence}% | Verification: ${fieldObj.verification}`}
+      >
+        <span className={`h-1.5 w-1.5 rounded-full ${fieldObj.verification === 'Verified' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+        {fieldObj.source} ({fieldObj.confidence}%)
+      </span>
+    );
+  };
 
   return (
     <div className="flex flex-col gap-6 animate-slide-down">
@@ -208,14 +252,19 @@ export const ContactDetailPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <span className={`inline-flex px-3 py-1 rounded-full text-xs font-extrabold border ${scoreBg}`}>
-            Decision Score: {score}
-          </span>
-          <Button
-            onClick={handleTriggerEnrichment}
-            isLoading={enrichMutation.isPending || isEnrichmentActive}
-            className="flex items-center gap-1.5 py-1.5 px-3.5 text-xs shadow-sm shadow-indigo-600/10 font-bold"
-          >
+            <span className={`inline-flex px-3 py-1 rounded-full text-xs font-extrabold border ${scoreBg}`}>
+              Decision Score: {score}
+            </span>
+            {isPipelineActive && (
+              <span className="inline-flex px-3 py-1 rounded-full text-[10px] font-extrabold border bg-blue-50 text-blue-700 border-blue-200 animate-pulse uppercase">
+                {enrichmentStatus.replace('_', ' ')}...
+              </span>
+            )}
+            <Button
+              onClick={handleTriggerEnrichment}
+              isLoading={enrichMutation.isPending || isPipelineActive}
+              className="flex items-center gap-1.5 py-1.5 px-3.5 text-xs shadow-sm shadow-indigo-600/10 font-bold"
+            >
             <Cpu className="h-4 w-4" /> Refresh Enrichment
           </Button>
         </div>
@@ -345,19 +394,19 @@ export const ContactDetailPage: React.FC = () => {
               )}
 
               {/* Confidence progress bar */}
-              {enrichmentStatus === 'COMPLETED' && aiProfile && (
+              {enrichmentStatus === 'COMPLETED' && verificationConfidence !== undefined && (
                 <div className="border-t border-slate-100 pt-4">
                   <div className="flex justify-between items-center text-xs font-bold mb-1">
                     <span className="text-slate-500">Retrieval Confidence</span>
-                    <span className={aiProfile.confidenceScore >= 0.8 ? 'text-emerald-600' : 'text-amber-600'}>
-                      {(aiProfile.confidenceScore * 100).toFixed(0)}%
+                    <span className={verificationConfidence >= 80 ? 'text-emerald-600' : 'text-amber-600'}>
+                      {verificationConfidence.toFixed(0)}%
                     </span>
                   </div>
                   <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-500
-                        ${aiProfile.confidenceScore >= 0.8 ? 'bg-emerald-500' : 'bg-amber-500'}`}
-                      style={{ width: `${(aiProfile.confidenceScore * 100)}%` }}
+                        ${verificationConfidence >= 80 ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                      style={{ width: `${verificationConfidence}%` }}
                     />
                   </div>
                 </div>
@@ -458,139 +507,515 @@ export const ContactDetailPage: React.FC = () => {
 
             {/* AI INTELLIGENCE TAB */}
             {activeTab === 'intelligence' && (
-              <div className="space-y-6">
-                {!aiProfile && enrichmentStatus !== 'COMPLETED' ? (
+              <div className="space-y-8 animate-fade-in text-slate-800">
+                {!aiProfile && !aiParsedSummary && !isPipelineActive ? (
                   <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-slate-100 rounded-xl">
                     <div className="p-4 bg-purple-50 rounded-full mb-4">
                       <Cpu className="h-8 w-8 text-purple-500 animate-pulse" />
                     </div>
-                    <h3 className="text-sm font-bold text-slate-800">No Intelligence Profile Available</h3>
+                    <h3 className="text-sm font-bold text-slate-800">No Verified Profile Found</h3>
                     <p className="text-xs text-slate-500 mt-2 max-w-sm">
-                      Trigger the Business Intelligence Agent using the "Refresh Enrichment" button above to generate a comprehensive profile.
+                      We could not find a highly confident match for this contact. Trigger the pipeline again or verify their details.
+                    </p>
+                  </div>
+                ) : isPipelineActive ? (
+                  <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-slate-100 rounded-xl">
+                    <div className="p-4 bg-blue-50 rounded-full mb-4">
+                      <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest">{enrichmentStatus.replace('_', ' ')}</h3>
+                    <p className="text-xs text-slate-500 mt-2 max-w-sm">
+                      The AI Intelligence pipeline is currently running this stage.
                     </p>
                   </div>
                 ) : (
                   <>
-                    {/* Top Stats */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Verification Status */}
-                      <div className="p-4 bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-xl">
-                        <h3 className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider mb-1">Verification Status</h3>
-                        <p className="text-sm font-bold text-indigo-900">{aiProfile?.verificationStatus || 'Verified via LinkedIn'}</p>
-                      </div>
-                      
-                      {/* AI Insights */}
-                      <div className="p-4 bg-gradient-to-br from-purple-50 to-white border border-purple-100 rounded-xl">
-                        <h3 className="text-[10px] text-purple-400 font-bold uppercase tracking-wider mb-1">Professional Insights</h3>
-                        <p className="text-sm font-bold text-purple-900">{aiProfile?.insights || 'Decision Maker / Specialist'}</p>
-                      </div>
-                    </div>
+                    {/* VERIFIED PROFILE HEADER & CONFIDENCE */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className={`col-span-2 p-6 rounded-2xl border bg-gradient-to-br transition-all duration-300 shadow-sm
+                        ${verificationStatus && verificationStatus.includes('Failed') 
+                          ? 'from-amber-50/50 via-white to-white border-amber-100/70 shadow-amber-500/2' 
+                          : 'from-emerald-50/50 via-white to-white border-emerald-100/70 shadow-emerald-500/2'}`}>
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide border mb-3
+                              ${verificationStatus && verificationStatus.includes('Failed') 
+                                ? 'bg-amber-100/65 text-amber-700 border-amber-200' 
+                                : 'bg-emerald-100/65 text-emerald-700 border-emerald-200'}`}>
+                              {verificationStatus || 'Verified'}
+                            </span>
+                            <h3 className="text-lg font-black tracking-tight text-slate-900 flex items-center flex-wrap">
+                              {aiProfile?.fullName || contact.name}
+                              {renderBadge('fullName')}
+                            </h3>
+                            <p className="text-xs text-slate-500 font-semibold mt-1 flex items-center flex-wrap">
+                              {aiProfile?.headline || contact.designation || 'Professional Profile'}
+                              {renderBadge('headline')}
+                            </p>
+                            
+                            {contact.professionalProfile?.providersUsed && contact.professionalProfile.providersUsed.length > 0 && (
+                              <div className="mt-4 flex flex-wrap gap-1.5 items-center">
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Sources Used:</span>
+                                {contact.professionalProfile.providersUsed.map((source: string) => (
+                                  <span key={source} className="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded text-[10px] font-bold text-slate-600">
+                                    {source}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
 
-                    {/* AI Professional Summary */}
-                    <div className="border-t border-slate-100 pt-5">
-                      <h3 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Executive Summary</h3>
-                      <div className="text-sm text-slate-700 leading-relaxed font-medium bg-slate-50 p-4 rounded-xl border border-slate-100">
-                        {aiProfile?.summary || contact.aiSummary?.summaryText || (
-                          <span className="text-slate-400 italic">No summary description generated yet.</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Conversation Starters */}
-                    {aiProfile?.conversationStarters && aiProfile.conversationStarters.length > 0 && (
-                      <div className="border-t border-slate-100 pt-5">
-                        <h3 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-3">Conversation Starters</h3>
-                        <div className="space-y-2">
-                          {aiProfile.conversationStarters.map((starter: string, idx: number) => (
-                            <div key={idx} className="flex items-start gap-2.5 p-3 bg-indigo-50/50 rounded-lg border border-indigo-50">
-                              <span className="text-indigo-500 mt-0.5">💬</span>
-                              <p className="text-xs font-semibold text-indigo-900">{starter}</p>
+                          {verificationConfidence !== undefined && (
+                            <div className="flex flex-col items-center shrink-0">
+                              <div className="relative h-16 w-16 flex items-center justify-center">
+                                <svg className="absolute transform -rotate-90 w-16 h-16">
+                                  <circle cx="32" cy="32" r="28" strokeWidth="4" stroke="#f1f5f9" fill="transparent" />
+                                  <circle cx="32" cy="32" r="28" strokeWidth="4" 
+                                    stroke={verificationStatus && verificationStatus.includes('Failed') ? '#f59e0b' : '#10b981'} 
+                                    fill="transparent" 
+                                    strokeDasharray={2 * Math.PI * 28}
+                                    strokeDashoffset={2 * Math.PI * 28 * (1 - verificationConfidence / 100)} 
+                                  />
+                                </svg>
+                                <span className="text-sm font-black text-slate-900">{verificationConfidence.toFixed(0)}%</span>
+                              </div>
+                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">Confidence</span>
                             </div>
-                          ))}
+                          )}
                         </div>
+                      </div>
+
+                      {/* DECISION MAKER GAUGE */}
+                      <div className="p-6 rounded-2xl border border-slate-100 bg-white shadow-sm flex flex-col justify-between">
+                        <div>
+                          <span className="inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide border bg-purple-50 text-purple-700 border-purple-100 mb-3">
+                            Target Insight
+                          </span>
+                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Decision Maker Score</h4>
+                          <p className="text-2xl font-black text-slate-950 mt-1">{contact.decisionMakerScore}/100</p>
+                        </div>
+                        <p className="text-[11px] font-medium text-slate-500 mt-2 leading-relaxed">
+                          {aiParsedSummary?.decisionMakerExplanation || 'Score evaluated based on current professional tier.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* ABOUT / SUMMARY */}
+                    {(aiProfile?.summary || aiProfile?.companyBio) && (
+                      <div className="bg-slate-50/50 border border-slate-100 p-6 rounded-2xl">
+                        <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2.5 flex items-center">About {renderBadge('summary') || renderBadge('companyBio')}</h4>
+                        <p className="text-sm text-slate-700 font-medium leading-relaxed">
+                          {aiProfile?.summary || aiProfile?.companyBio}
+                        </p>
                       </div>
                     )}
 
-                    {/* Skills tags cloud */}
-                    <div className="border-t border-slate-100 pt-5">
-                      <h3 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-3">Verified Skills</h3>
-                      {contact.skills && contact.skills.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {contact.skills.map((skill) => (
-                            <span
-                              key={skill}
-                              className="px-3 py-1 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-100/50 text-indigo-700 rounded-lg text-xs font-bold shadow-sm shadow-purple-500/5"
-                            >
-                              {skill}
-                            </span>
-                          ))}
+                    {/* EXECUTIVE SUMMARY & HIGHLIGHTS */}
+                    {(aiParsedSummary?.executiveSummary || (aiParsedSummary?.careerHighlights && aiParsedSummary.careerHighlights.length > 0)) && (
+                      <div className="bg-slate-50/50 border border-slate-100 p-6 rounded-2xl space-y-4">
+                        {aiParsedSummary?.executiveSummary && (
+                          <div>
+                            <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2.5">AI Professional Summary</h4>
+                            <p className="text-sm text-slate-700 font-medium leading-relaxed">
+                              {aiParsedSummary.executiveSummary}
+                            </p>
+                          </div>
+                        )}
+                        {aiParsedSummary?.careerHighlights && aiParsedSummary.careerHighlights.length > 0 && (
+                          <div>
+                            <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Key Career Highlights</h4>
+                            <ul className="list-disc list-inside text-xs font-semibold text-slate-700 space-y-1.5 pl-1">
+                              {aiParsedSummary.careerHighlights.map((hl: string, idx: number) => (
+                                <li key={idx} className="leading-relaxed">{hl}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* TWO COLUMN CONTENT LAYOUT */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 border-t border-slate-100 pt-6">
+                      
+                      {/* LEFT COLUMN: HISTORY & EDUCATION */}
+                      <div className="space-y-6">
+                        {/* Career Timeline */}
+                        <div>
+                          <h3 className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <Briefcase className="h-4 w-4 text-indigo-500" /> Career Timeline
+                          </h3>
+                          {aiProfile?.experience && aiProfile.experience.length > 0 ? (
+                            <div className="relative border-l-2 border-slate-100 pl-5 ml-2.5 space-y-6">
+                              {aiProfile.experience.map((exp: any, idx: number) => (
+                                <div key={idx} className="relative flex flex-col gap-1">
+                                  <span className="absolute -left-[26px] top-1.5 h-3 w-3 rounded-full bg-indigo-500 border-2 border-white shadow-sm" />
+                                  <h4 className="text-sm font-bold text-slate-900 leading-tight">{exp.title}</h4>
+                                  <div className="flex items-center text-xs text-slate-500 font-semibold">
+                                    <span className="text-indigo-600">{exp.company}</span>
+                                    <span className="mx-2">•</span>
+                                    <span>{exp.period}</span>
+                                  </div>
+                                  {exp.description && (
+                                    <p className="text-xs text-slate-500 font-medium leading-relaxed mt-1">{exp.description}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-400 italic">No experience history cataloged.</p>
+                          )}
                         </div>
-                      ) : (
-                        <p className="text-xs text-slate-400 italic">No skills cataloged.</p>
+
+                        {/* Education */}
+                        <div className="border-t border-slate-50 pt-5">
+                          <h3 className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <Award className="h-4 w-4 text-purple-500" /> Education
+                          </h3>
+                          {aiProfile?.education && aiProfile.education.length > 0 ? (
+                            <div className="relative border-l-2 border-slate-100 pl-5 ml-2.5 space-y-6">
+                              {aiProfile.education.map((edu: any, idx: number) => (
+                                <div key={idx} className="relative flex flex-col gap-1">
+                                  <span className="absolute -left-[26px] top-1.5 h-3 w-3 rounded-full bg-purple-500 border-2 border-white shadow-sm" />
+                                  <h4 className="text-sm font-bold text-slate-900 leading-tight">{edu.degree}</h4>
+                                  <div className="flex items-center text-xs text-slate-500 font-semibold">
+                                    <span className="text-purple-600">{edu.school}</span>
+                                    {edu.year && (
+                                      <>
+                                        <span className="mx-2">•</span>
+                                        <span>Graduation Year: {edu.year}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                  {edu.fieldOfStudy && (
+                                    <p className="text-xs text-slate-500 font-semibold">Field of Study: {edu.fieldOfStudy}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-400 italic">No education details cataloged.</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* RIGHT COLUMN: SKILLS, PROJECTS & LINKS */}
+                      <div className="space-y-6">
+                        {/* Verified Skills */}
+                        <div>
+                          <h3 className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-3">Verified Skills</h3>
+                          {contact.skills && contact.skills.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {contact.skills.map((skill) => (
+                                <span key={skill} className="px-2.5 py-1 bg-indigo-50 border border-indigo-100/50 text-indigo-700 rounded-lg text-xs font-bold shadow-sm shadow-indigo-500/2">
+                                  {skill}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-400 italic">No verified skills detected.</p>
+                          )}
+                        </div>
+
+                        {/* Projects */}
+                        {aiProfile?.projects && aiProfile.projects.length > 0 && (
+                          <div className="border-t border-slate-50 pt-5">
+                            <h3 className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-3">Featured Projects</h3>
+                            <div className="space-y-3">
+                              {aiProfile.projects.map((proj: any, idx: number) => (
+                                <div key={idx} className="p-4 bg-white border border-slate-100 shadow-sm rounded-xl">
+                                  <h4 className="text-xs font-black text-slate-900">{proj.name}</h4>
+                                  <p className="text-xs text-slate-500 mt-1 font-medium leading-relaxed">{proj.description}</p>
+                                  {proj.technologies && proj.technologies.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-2.5">
+                                      {proj.technologies.map((t: string) => (
+                                        <span key={t} className="px-1.5 py-0.5 bg-slate-50 border border-slate-200 text-slate-600 rounded text-[9px] font-bold">
+                                          {t}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Public Links */}
+                        <div className="border-t border-slate-50 pt-5">
+                          <h3 className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-3">Professional Profiles</h3>
+                          <div className="flex flex-wrap gap-2">
+                            {aiProfile?.publicProfiles && aiProfile.publicProfiles.map((p: any, idx: number) => (
+                              <a key={idx} href={p.url} target="_blank" rel="noopener noreferrer" 
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-indigo-50/50 border border-slate-200 hover:border-indigo-200 text-slate-700 hover:text-indigo-800 rounded-lg text-xs font-bold transition-all shadow-sm">
+                                <ExternalLink className="h-3.5 w-3.5 shrink-0" /> {p.platform}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* DYNAMIC ACCORDIONS GRID */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-slate-100 pt-6">
+                      {/* Languages */}
+                      {aiProfile?.languages && aiProfile.languages.length > 0 && (
+                        <div className="p-5 bg-slate-50/40 border border-slate-100 rounded-2xl">
+                          <h4 className="text-xs font-black text-slate-900 mb-2">Languages</h4>
+                          <div className="flex flex-wrap gap-1.5">
+                            {aiProfile.languages.map((l: string) => (
+                              <span key={l} className="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 rounded-md text-xs font-semibold">
+                                {l}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Certifications */}
+                      {aiProfile?.certifications && aiProfile.certifications.length > 0 && (
+                        <div className="p-5 bg-slate-50/40 border border-slate-100 rounded-2xl">
+                          <h4 className="text-xs font-black text-slate-900 mb-2">Certifications</h4>
+                          <ul className="list-disc pl-4 space-y-1 text-xs font-semibold text-slate-700">
+                            {aiProfile.certifications.map((c: string, idx: number) => (
+                              <li key={idx}>{c}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Achievements */}
+                      {aiProfile?.achievements && aiProfile.achievements.length > 0 && (
+                        <div className="p-5 bg-slate-50/40 border border-slate-100 rounded-2xl">
+                          <h4 className="text-xs font-black text-slate-900 mb-2">Achievements</h4>
+                          <ul className="list-disc pl-4 space-y-1 text-xs font-semibold text-slate-700">
+                            {aiProfile.achievements.map((a: string, idx: number) => (
+                              <li key={idx}>{a}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Interests */}
+                      {aiProfile?.interests && aiProfile.interests.length > 0 && (
+                        <div className="p-5 bg-slate-50/40 border border-slate-100 rounded-2xl">
+                          <h4 className="text-xs font-black text-slate-900 mb-2">Interests</h4>
+                          <div className="flex flex-wrap gap-1.5">
+                            {aiProfile.interests.map((i: string) => (
+                              <span key={i} className="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 rounded-md text-xs font-semibold">
+                                {i}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
                       )}
                     </div>
 
-                    {/* Experience History (Enrichment payload data) */}
-                    {aiProfile?.experience && aiProfile.experience.length > 0 && (
-                      <div className="border-t border-slate-100 pt-5">
-                        <h3 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-4">Career Timeline</h3>
-                        <div className="relative border-l-2 border-indigo-100 pl-4 ml-2 space-y-6">
-                          {aiProfile.experience.map((exp: any, idx: number) => (
-                            <div key={idx} className="relative flex flex-col gap-1">
-                              <span className="absolute -left-[23px] top-1.5 h-2.5 w-2.5 rounded-full bg-indigo-500 border-2 border-white shadow-sm" />
-                              <h4 className="text-sm font-bold text-slate-800">{exp.title}</h4>
-                              <div className="flex items-center text-xs text-slate-500 font-semibold mt-0.5">
-                                <span className="text-indigo-600">{exp.company}</span>
-                                <span className="mx-2">•</span>
-                                <span>{exp.period}</span>
-                              </div>
+                    {/* GITHUB STATS BAR */}
+                    {aiProfile?.githubStats && (
+                      <div className="border-t border-slate-100 pt-6">
+                        <h3 className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                          <span>⚡</span> GitHub Profile
+                        </h3>
+                        <div className="grid grid-cols-3 gap-4 mb-5">
+                          <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl text-center">
+                            <p className="text-xl font-black text-slate-900">{aiProfile.githubStats.followers?.toLocaleString()}</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Followers</p>
+                          </div>
+                          <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl text-center">
+                            <p className="text-xl font-black text-slate-900">{aiProfile.githubStats.following?.toLocaleString()}</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Following</p>
+                          </div>
+                          <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl text-center">
+                            <p className="text-xl font-black text-slate-900">{aiProfile.githubStats.publicRepos?.toLocaleString()}</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Public Repos</p>
+                          </div>
+                        </div>
+
+                        {/* Primary Languages */}
+                        {aiProfile?.primaryLanguages && aiProfile.primaryLanguages.length > 0 && (
+                          <div className="mb-5">
+                            <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Primary Languages</h4>
+                            <div className="flex flex-wrap gap-1.5">
+                              {aiProfile.primaryLanguages.map((lang: string) => (
+                                <span key={lang} className="px-2.5 py-1 bg-blue-50 border border-blue-100 text-blue-700 rounded-lg text-xs font-bold">{lang}</span>
+                              ))}
                             </div>
-                          ))}
+                          </div>
+                        )}
+
+                        {/* Technologies */}
+                        {aiProfile?.technologies && aiProfile.technologies.length > 0 && (
+                          <div className="mb-5">
+                            <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">Technologies & Topics</h4>
+                            <div className="flex flex-wrap gap-1.5">
+                              {aiProfile.technologies.map((tech: string) => (
+                                <span key={tech} className="px-2.5 py-1 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-lg text-xs font-bold">{tech}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Repositories */}
+                        {aiProfile?.repositories && aiProfile.repositories.length > 0 && (
+                          <div>
+                            <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-3">Public Repositories</h4>
+                            <div className="space-y-2">
+                              {aiProfile.repositories.slice(0, 6).map((repo: any, idx: number) => (
+                                <a key={idx} href={repo.url} target="_blank" rel="noopener noreferrer"
+                                  className="flex items-start justify-between gap-3 p-3 bg-white border border-slate-100 rounded-xl hover:border-indigo-200 hover:bg-indigo-50/30 transition-all group">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-black text-slate-900 group-hover:text-indigo-700 truncate">{repo.name}</p>
+                                    {repo.description && (
+                                      <p className="text-xs text-slate-500 mt-0.5 font-medium leading-relaxed line-clamp-2">{repo.description}</p>
+                                    )}
+                                    {repo.topics && repo.topics.length > 0 && (
+                                      <div className="flex flex-wrap gap-1 mt-1.5">
+                                        {repo.topics.slice(0, 4).map((t: string) => (
+                                          <span key={t} className="px-1.5 py-0.5 bg-slate-50 border border-slate-200 text-slate-500 rounded text-[9px] font-bold">{t}</span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-col items-end gap-1 shrink-0">
+                                    {repo.language && (
+                                      <span className="px-2 py-0.5 bg-blue-50 border border-blue-100 text-blue-600 rounded text-[10px] font-bold">{repo.language}</span>
+                                    )}
+                                    <span className="text-[10px] text-slate-400 font-semibold">⭐ {repo.stars}</span>
+                                  </div>
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* COMPANY WEBSITE BIO */}
+                    {aiProfile?.companyRole && (
+                      <div className="border-t border-slate-100 pt-6">
+                        <h3 className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                          <Globe className="h-4 w-4 text-orange-500" /> Company Website
+                        </h3>
+                        <div className="p-5 bg-orange-50/30 border border-orange-100/60 rounded-2xl flex gap-4">
+                          {aiProfile.companyPhotoUrl && (
+                            <img src={aiProfile.companyPhotoUrl} alt={contact.name} className="h-14 w-14 rounded-full object-cover shrink-0 border border-orange-100" />
+                          )}
+                          <div>
+                            {aiProfile.companyRole && (
+                              <p className="text-xs font-bold text-orange-700 mb-1">{aiProfile.companyRole}</p>
+                            )}
+                            {aiProfile.companyBio && (
+                              <p className="text-xs text-slate-600 font-medium leading-relaxed">{aiProfile.companyBio}</p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}
 
-                    {/* Education History (Enrichment payload data) */}
-                    {aiProfile?.education && aiProfile.education.length > 0 && (
-                      <div className="border-t border-slate-100 pt-5">
-                        <h3 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-4">Education</h3>
-                        <div className="relative border-l-2 border-purple-100 pl-4 ml-2 space-y-6">
-                          {aiProfile.education.map((edu: any, idx: number) => (
-                            <div key={idx} className="relative flex flex-col gap-1">
-                              <span className="absolute -left-[23px] top-1.5 h-2.5 w-2.5 rounded-full bg-purple-500 border-2 border-white shadow-sm" />
-                              <h4 className="text-sm font-bold text-slate-800">{edu.degree}</h4>
-                              <div className="flex items-center text-xs text-slate-500 font-semibold mt-0.5">
-                                <span className="text-purple-600">{edu.school}</span>
-                                <span className="mx-2">•</span>
-                                <span>{edu.year}</span>
+                    {/* AI INSIGHTS & SUGGESTIONS */}
+                    <div className="border-t border-slate-100 pt-6 space-y-6">
+                      <h3 className="text-xs text-slate-400 font-bold uppercase tracking-wider">AI Insights & Engagement Strategies</h3>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Conversation Starters */}
+                        {aiParsedSummary?.conversationStarters && aiParsedSummary.conversationStarters.length > 0 && (
+                          <div className="p-5 bg-gradient-to-br from-indigo-50/30 to-white border border-indigo-100/60 rounded-2xl">
+                            <h4 className="text-xs font-black text-indigo-950 mb-3 flex items-center gap-1.5">💬 Conversation Starters</h4>
+                            <div className="space-y-2">
+                              {aiParsedSummary.conversationStarters.map((starter: string, idx: number) => (
+                                <div key={idx} className="p-3 bg-white border border-indigo-50/60 rounded-xl">
+                                  <p className="text-xs font-semibold text-slate-700 leading-relaxed">"{starter}"</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Networking Suggestions & Strengths */}
+                        <div className="space-y-4">
+                          {aiParsedSummary?.networkingSuggestions && (
+                            <div className="p-5 bg-gradient-to-br from-purple-50/30 to-white border border-purple-100/60 rounded-2xl">
+                              <h4 className="text-xs font-black text-purple-950 mb-2.5">🤝 Networking Strategy</h4>
+                              <p className="text-xs text-slate-600 font-semibold leading-relaxed">
+                                {aiParsedSummary.networkingSuggestions}
+                              </p>
+                            </div>
+                          )}
+
+                          {aiParsedSummary?.professionalStrengths && aiParsedSummary.professionalStrengths.length > 0 && (
+                            <div className="p-5 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                              <h4 className="text-xs font-black text-slate-900 mb-2.5">⭐ Professional Strengths</h4>
+                              <div className="flex flex-wrap gap-1.5">
+                                {aiParsedSummary.professionalStrengths.map((str: string, idx: number) => (
+                                  <span key={idx} className="px-2.5 py-1 bg-white border border-slate-200 text-slate-700 rounded-lg text-xs font-bold shadow-sm">
+                                    {str}
+                                  </span>
+                                ))}
                               </div>
                             </div>
-                          ))}
-                        </div>
+                          )}
+                      </div>
+                    </div>
+
+                    {/* Meeting Preparation Brief */}
+                    {aiParsedSummary?.meetingPreparation && (
+                      <div className="mt-6 p-5 bg-gradient-to-br from-emerald-50/30 to-white border border-emerald-100/60 rounded-2xl">
+                        <h4 className="text-xs font-black text-emerald-950 mb-2.5">📅 Meeting Preparation Brief</h4>
+                        <p className="text-xs text-slate-600 font-semibold leading-relaxed">
+                          {aiParsedSummary.meetingPreparation}
+                        </p>
                       </div>
                     )}
 
-                    {/* Social links */}
-                    {aiProfile?.publicProfiles && aiProfile.publicProfiles.length > 0 && (
-                      <div className="border-t border-slate-100 pt-5">
-                        <h3 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-3">Public Profiles</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {aiProfile.publicProfiles.map((p: any, idx: number) => (
-                            <a
-                              key={idx}
-                              href={p.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 hover:text-indigo-700 rounded-lg text-xs font-bold transition-all shadow-sm"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                              {p.platform}
-                            </a>
-                          ))}
+                    {/* Field-Level Verification Attribution Table */}
+                    {contact.professionalProfile?.sourceAttribution && Object.keys(contact.professionalProfile.sourceAttribution).length > 0 && (
+                      <div className="mt-6 space-y-4">
+                        <h3 className="text-xs text-slate-400 font-bold uppercase tracking-wider">Field-Level Verification Attribution</h3>
+                        <div className="overflow-x-auto border border-slate-100 rounded-xl bg-white shadow-sm">
+                          <table className="min-w-full text-left text-xs text-slate-500">
+                            <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wide border-b border-slate-100">
+                              <tr>
+                                <th className="py-3 px-4">Field</th>
+                                <th className="py-3 px-4">Source</th>
+                                <th className="py-3 px-4">Confidence</th>
+                                <th className="py-3 px-4">Verification</th>
+                                <th className="py-3 px-4">Timestamp</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 font-semibold text-slate-850">
+                              {Object.entries(contact.professionalProfile.sourceAttribution).map(([field, attr]: [string, any]) => (
+                                <tr key={field} className="hover:bg-slate-50/40">
+                                  <td className="py-3 px-4 text-indigo-600 font-bold capitalize">
+                                    {field.replace(/([A-Z])/g, ' $1')}
+                                  </td>
+                                  <td className="py-3 px-4 font-medium text-slate-500">
+                                    {attr.source}
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold
+                                      ${attr.confidence >= 80 ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                        (attr.confidence >= 60 ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-rose-50 text-rose-700 border border-rose-100')}`}>
+                                      {attr.confidence}%
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold
+                                      ${attr.verification === 'Verified' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
+                                      {attr.verification}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 font-medium text-slate-400">
+                                    {new Date(attr.timestamp).toLocaleString()}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
                       </div>
                     )}
-                  </>
+                  </div>
+                </>
                 )}
               </div>
             )}

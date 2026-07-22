@@ -205,6 +205,15 @@ export const ocrWorker = new Worker(
         await contactsService.addTags(userId, activeContactId, ['needs-manual-review']).catch(() => {});
       }
 
+      // Automatically trigger professional profile enrichment
+      if (activeContactId) {
+        logger.info(`[OCR Job] Auto-triggering professional profile enrichment for contact: ${activeContactId}`);
+        const enrichmentService = new ProfileEnrichmentService();
+        await enrichmentService.triggerEnrichment(userId, activeContactId).catch((err) => {
+          logger.error(`[OCR Job] Failed to auto-trigger enrichment: ${err.message}`);
+        });
+      }
+
       logger.info(`[OCR Job] Successfully completed business card: ${businessCardId} in ${Date.now() - startTime}ms`);
     } catch (error: any) {
       logger.error(`[OCR Job] Error on business card ${businessCardId}: ${error.message}`);
@@ -223,16 +232,19 @@ export const enrichmentWorker = new Worker(
   'enrichment-queue',
   async (job: Job) => {
     const { contactId, profileId } = job.data;
-    logger.info(`[Enrichment Job] Started enrichment for profile: ${profileId}`);
-    const startTime = Date.now();
+    const pipelineStartTime = Date.now();
+    logger.info(`[Enrichment Pipeline] START - Enrichment process initiated for profile: ${profileId}`);
+
+    const updateStatus = async (status: any) => {
+      await prisma.professionalProfile.update({
+        where: { id: profileId },
+        data: { enrichmentStatus: status },
+      });
+    };
 
     try {
-      await prisma.linkedInProfile.update({
-        where: { id: profileId },
-        data: { enrichmentStatus: JobStatus.PROCESSING },
-      });
+      await updateStatus(JobStatus.PROCESSING);
 
-      // Fetch contact details
       const contact = await prisma.contact.findUnique({
         where: { id: contactId },
       });
@@ -241,59 +253,101 @@ export const enrichmentWorker = new Worker(
         throw new Error(`Contact not found for ID: ${contactId}`);
       }
 
-      // Run real enrichment using Gemini with Search grounding
-      const enrichmentData = await enrichmentService.instantEnrich(
-        contact.name,
-        contact.email,
-        contact.company
-      );
+      // STAGE 1: Profile Discovery & Extraction
+      const discoveryStartTime = Date.now();
+      logger.info(`[Enrichment Pipeline] STAGE START: Profile Discovery`);
+      
+      await updateStatus(JobStatus.FETCHING_PROFILE);
+      const pipelineResult = await enrichmentService.runDiscoveryPipeline(contact);
+      
+      const discoveryDuration = Date.now() - discoveryStartTime;
+      logger.info(`[Enrichment Pipeline] STAGE SUCCESS: Profile Discovery completed in ${discoveryDuration}ms`);
 
-      // Save enrichment results to LinkedInProfile
-      await prisma.linkedInProfile.update({
+      // STAGE 2: Verification
+      const verificationStartTime = Date.now();
+      logger.info(`[Enrichment Pipeline] STAGE START: Verification`);
+      
+      await updateStatus(JobStatus.VERIFYING);
+      
+      const isVerified = pipelineResult?.verification?.isVerified || false;
+      const confidence = pipelineResult?.verification?.confidence || 0;
+      const verificationStatus = isVerified ? 'Verified' : 'No verified professional profile found';
+      
+      await prisma.professionalProfile.update({
         where: { id: profileId },
         data: {
-          enrichmentStatus: JobStatus.COMPLETED,
-          salesNavigatorId: enrichmentData.salesNavigatorId || null,
-          linkedInUrl: enrichmentData.publicProfiles?.find((p: any) => p.platform === 'LinkedIn')?.url || null,
-          profileData: enrichmentData,
-        },
+          verificationConfidence: confidence,
+          verificationStatus: verificationStatus,
+          providersUsed: pipelineResult?.providersUsed || [],
+          providerResponses: pipelineResult?.providerResponses || null,
+          mergedProfile: pipelineResult?.mergedProfile || null,
+          sourceAttribution: pipelineResult?.sourceAttribution || null,
+        }
       });
 
-      const enrichedScore = calculateDecisionMakerScore(contact.designation || enrichmentData.designation || '');
+      const verificationDuration = Date.now() - verificationStartTime;
+      logger.info(`[Enrichment Pipeline] STAGE SUCCESS: Verification computed confidence as ${confidence}% (${verificationStatus}) in ${verificationDuration}ms`);
 
-      // Update contact fields
+      // STAGE 3: Database Save (separating OCR from enriched details)
+      const dbSaveStartTime = Date.now();
+      logger.info(`[Enrichment Pipeline] STAGE START: Database Save (Merging Data)`);
+      
+      const enrichedScore = calculateDecisionMakerScore(pipelineResult?.mergedProfile?.designation || contact.designation || '');
       await prisma.contact.update({
         where: { id: contactId },
         data: {
-          skills: enrichmentData.skills || [],
-          industry: enrichmentData.industry || 'Professional Services',
-          experience: enrichmentData.experience || null,
-          education: enrichmentData.education || null,
-          interests: enrichmentData.interests || [],
+          skills: pipelineResult?.mergedProfile?.skills || [],
+          industry: pipelineResult?.mergedProfile?.headline || 'Professional Services',
+          experience: pipelineResult?.mergedProfile?.experience || null,
+          education: pipelineResult?.mergedProfile?.education || null,
           decisionMakerScore: enrichedScore,
         },
       });
 
-      // Write timeline audit log
+      const dbSaveDuration = Date.now() - dbSaveStartTime;
+      logger.info(`[Enrichment Pipeline] STAGE SUCCESS: Merged data saved successfully to database in ${dbSaveDuration}ms`);
+
+      // STAGE 4: AI Insights generation (optional — Gemini failure does NOT block pipeline)
+      const summaryStartTime = Date.now();
+      logger.info(`[Enrichment Pipeline] STAGE START: AI Insights Generation (Gemini) [optional]`);
+      await updateStatus(JobStatus.GENERATING_SUMMARY);
+      try {
+        await aiSummaryService.generateSummary(contact.userId, contactId);
+        const summaryDuration = Date.now() - summaryStartTime;
+        logger.info(`[Enrichment Pipeline] STAGE SUCCESS: AI Insights generated in ${summaryDuration}ms`);
+      } catch (summaryErr: any) {
+        logger.warn(`[Enrichment Pipeline] STAGE SKIPPED: AI Insights generation failed (non-blocking): ${summaryErr.message}`);
+        // Save a fallback summary record so the UI has something to display
+        await prisma.aISummary.upsert({
+          where: { contactId },
+          create: { contactId, summaryText: JSON.stringify({ executiveSummary: '', professionalHighlights: [], careerSummary: '', decisionMakerExplanation: '', conversationStarters: [], networkingSuggestions: '', professionalStrengths: [] }), status: 'COMPLETED' as any },
+          update: { summaryText: JSON.stringify({ executiveSummary: '', professionalHighlights: [], careerSummary: '', decisionMakerExplanation: '', conversationStarters: [], networkingSuggestions: '', professionalStrengths: [] }), status: 'COMPLETED' as any },
+        }).catch(() => {});
+      }
+
+      // STATE: COMPLETED — always reached unless Discovery itself throws
+      await updateStatus(JobStatus.COMPLETED);
+
       await prisma.auditLog.create({
         data: {
           userId: contact.userId,
-          action: 'PROFILE_ENRICHED',
+          action: 'PROFILE_PIPELINE_COMPLETED',
           entity: 'Contact',
           entityId: contactId,
-          details: { processingTimeMs: Date.now() - startTime },
+          details: { processingTimeMs: Date.now() - pipelineStartTime, verified: isVerified },
         },
       }).catch(() => {});
 
-      logger.info(`[Enrichment Job] Successfully enriched profile: ${profileId} in ${Date.now() - startTime}ms`);
+      const totalDuration = Date.now() - pipelineStartTime;
+      logger.info(`[Enrichment Pipeline] SUCCESS - Pipeline completed for profile: ${profileId} in ${totalDuration}ms`);
     } catch (error: any) {
-      logger.error(`[Enrichment Job] Error on profile ${profileId}: ${error.message}`);
-      await prisma.linkedInProfile.update({
-        where: { id: profileId },
-        data: { enrichmentStatus: JobStatus.FAILED },
-      }).catch(() => {});
+      const failedDuration = Date.now() - pipelineStartTime;
+      logger.error(`[Enrichment Pipeline] FAILED - Pipeline crashed after ${failedDuration}ms. Reason: ${error.message}`);
+      logger.error(error.stack || error);
+      await updateStatus(JobStatus.FAILED).catch((dbErr) => logger.error(`[Enrichment Pipeline] Failed to update status: ${dbErr.message}`));
       throw error;
     }
+
   },
   { connection: connectionOptions }
 );
@@ -331,11 +385,12 @@ export const aiSummaryWorker = new Worker(
 
       logger.info(`[AI Summary Job] Successfully completed AI summary for contact: ${contactId} in ${Date.now() - startTime}ms`);
     } catch (error: any) {
-      logger.error(`[AI Summary Job] Error on AI summary ${aiSummaryId}: ${error.message}`);
+      logger.error(`[AI Summary Job] Error on AI summary ${aiSummaryId}:`);
+      logger.error(error.stack || error.message);
       await prisma.aISummary.update({
         where: { id: aiSummaryId },
         data: { status: JobStatus.FAILED },
-      }).catch(() => {});
+      }).catch((dbErr) => logger.error(`[AI Summary Job] Failed to update status: ${dbErr.message}`));
       throw error;
     }
   },
@@ -408,11 +463,12 @@ export const faceRecognitionWorker = new Worker(
 
       logger.info(`[Face Job] Completed face recognition processing: ${faceRecognitionId} in ${Date.now() - startTime}ms`);
     } catch (error: any) {
-      logger.error(`[Face Job] Error on face recognition ${faceRecognitionId}: ${error.message}`);
+      logger.error(`[Face Job] Error on face recognition ${faceRecognitionId}:`);
+      logger.error(error.stack || error.message);
       await prisma.faceRecognition.update({
         where: { id: faceRecognitionId },
         data: { status: JobStatus.FAILED },
-      }).catch(() => {});
+      }).catch((dbErr) => logger.error(`[Face Job] Failed to update status: ${dbErr.message}`));
       throw error;
     }
   },

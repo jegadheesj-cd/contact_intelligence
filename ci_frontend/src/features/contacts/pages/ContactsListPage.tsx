@@ -231,7 +231,7 @@ export const ContactsListPage: React.FC = () => {
                       ? 'bg-amber-50 text-amber-700 border-amber-100'
                       : 'bg-slate-100 text-slate-600 border-slate-200';
 
-                  const enrichmentStatus = contact.linkedInProfile?.enrichmentStatus || 'PENDING';
+                  const enrichmentStatus = contact.professionalProfile?.enrichmentStatus || 'PENDING';
 
                   return (
                     <tr

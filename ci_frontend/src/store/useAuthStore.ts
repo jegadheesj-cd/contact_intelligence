@@ -42,6 +42,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.removeItem('ci_access_token');
     localStorage.removeItem('ci_refresh_token');
     set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
+    // Force a hard redirect to login page if we are in the browser
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
   },
 
   setTokens: (accessToken, refreshToken) => {
