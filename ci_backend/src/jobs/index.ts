@@ -292,14 +292,15 @@ export const enrichmentWorker = new Worker(
       const dbSaveStartTime = Date.now();
       logger.info(`[Enrichment Pipeline] STAGE START: Database Save (Merging Data)`);
       
-      const enrichedScore = calculateDecisionMakerScore(pipelineResult?.mergedProfile?.designation || contact.designation || '');
+      const designationValue = pipelineResult?.mergedProfile?.designation?.value || contact.designation || '';
+      const enrichedScore = calculateDecisionMakerScore(designationValue);
       await prisma.contact.update({
         where: { id: contactId },
         data: {
-          skills: pipelineResult?.mergedProfile?.skills || [],
-          industry: pipelineResult?.mergedProfile?.headline || 'Professional Services',
-          experience: pipelineResult?.mergedProfile?.experience || null,
-          education: pipelineResult?.mergedProfile?.education || null,
+          skills: pipelineResult?.mergedProfile?.skills?.value || [],
+          industry: pipelineResult?.mergedProfile?.headline?.value || 'Professional Services',
+          experience: pipelineResult?.mergedProfile?.experience?.value || null,
+          education: pipelineResult?.mergedProfile?.education?.value || null,
           decisionMakerScore: enrichedScore,
         },
       });

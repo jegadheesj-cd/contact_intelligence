@@ -51,6 +51,7 @@ export interface DiscoveryResult {
   searchQueries: string[];
   allDiscoveredUrls: Array<{ url: string; source: string }>;
   rejectionReasons: string[];
+  searchProcess: Record<string, string>;
 }
 
 export class ProfileDiscoveryEngine {
@@ -78,20 +79,34 @@ export class ProfileDiscoveryEngine {
     const allDiscoveredUrls: Array<{ url: string; source: string }> = [];
     const searchQueries: string[] = [];
     const rejectionReasons: string[] = [];
+    const searchProcess: Record<string, string> = {
+      "Brave Search": "0 Results",
+      "Google Custom Search": "0 Results",
+      "Bing Search": "0 Results",
+      "DuckDuckGo Scraper": "0 Results",
+      "Tavily Search": "0 Results"
+    };
     
-    let linkedInUrl: string | null = null;
-    let githubUrl: string | null = null;
-    let companyWebsiteUrl: string | null = null;
-    let linkedinConfidence = 0;
-    let linkedinVerificationStatus = 'Unverified';
+    const discoveredLinkedInUrls = new Set<string>();
+    const discoveredGitHubUrls = new Set<string>();
+    const discoveredCompanyUrls = new Set<string>();
+    const discoveredPortfolioUrls = new Set<string>();
+
+    const trackSearchProviderResults = (results: any[]) => {
+      const provider = this.searchAdapter.lastProviderUsed;
+      const current = searchProcess[provider] || "0 Results";
+      let count = 0;
+      if (current.includes("Results")) {
+        count = parseInt(current.split(" ")[0]) || 0;
+      }
+      searchProcess[provider] = `${count + results.length} Results`;
+    };
 
     // 1. Check for direct LinkedIn URL on the card
     if (signals.website && signals.website.includes('linkedin.com/in/')) {
-      linkedInUrl = signals.website;
-      linkedinConfidence = 100;
-      linkedinVerificationStatus = 'Verified';
-      logger.info(`[ProfileDiscoveryEngine] Direct LinkedIn URL found: ${linkedInUrl}`);
-      allDiscoveredUrls.push({ url: linkedInUrl, source: 'business-card-direct' });
+      logger.info(`[ProfileDiscoveryEngine] Direct LinkedIn URL found: ${signals.website}`);
+      discoveredLinkedInUrls.add(signals.website);
+      allDiscoveredUrls.push({ url: signals.website, source: 'business-card-direct' });
     }
 
     logger.info(`[ProfileDiscoveryEngine] Executing stage: Search Query Builder`);
@@ -99,76 +114,60 @@ export class ProfileDiscoveryEngine {
     const githubQueries = this.queryBuilder.buildGitHubQueries(signals);
     const companyQueries = this.queryBuilder.buildCompanyQueries(signals);
 
-    // 2. Discover LinkedIn URL via queries if not found directly
-    if (!linkedInUrl) {
-      let bestCandidateScore = 0;
-      let bestCandidateUrl = '';
+    // 2. Discover LinkedIn URLs via queries
+    for (const query of linkedinQueries) {
+      searchQueries.push(query);
+      try {
+        logger.info(`[ProfileDiscoveryEngine] Executing search query: "${query}"`);
+        const results = await this.searchAdapter.search(query);
+        trackSearchProviderResults(results);
 
-      for (const query of linkedinQueries) {
-        searchQueries.push(query);
-        try {
-          logger.info(`[ProfileDiscoveryEngine] Executing search query: "${query}"`);
-          const results = await this.searchAdapter.search(query);
-
-          for (const res of results) {
-            if (res.url.includes('linkedin.com/in/')) {
-              allDiscoveredUrls.push({ url: res.url, source: 'linkedin-discovery-search' });
-              const score = this.evaluateLinkedInUrlCandidate(signals, res.url, res.title, res.snippet);
-              if (score > bestCandidateScore) {
-                bestCandidateScore = score;
-                bestCandidateUrl = res.url;
-              }
-            }
+        for (const res of results) {
+          if (res.url.includes('linkedin.com/in/')) {
+            discoveredLinkedInUrls.add(res.url);
+            allDiscoveredUrls.push({ url: res.url, source: 'linkedin-discovery-search' });
           }
-        } catch (e: any) {
-          logger.warn(`[ProfileDiscoveryEngine] LinkedIn Search failed: ${e.message}`);
-          rejectionReasons.push(`LinkedIn discovery query "${query}" failed: ${e.message}`);
         }
-      }
-
-      if (bestCandidateUrl && bestCandidateScore >= 40) {
-        linkedInUrl = bestCandidateUrl;
-        linkedinConfidence = bestCandidateScore;
-        linkedinVerificationStatus = bestCandidateScore >= 70 ? 'Verified' : 'Unverified';
-        logger.info(`[ProfileDiscoveryEngine] Discovered LinkedIn URL: ${linkedInUrl} (Confidence: ${linkedinConfidence}%)`);
+      } catch (e: any) {
+        logger.warn(`[ProfileDiscoveryEngine] LinkedIn Search failed for query "${query}": ${e.message}`);
+        rejectionReasons.push(`LinkedIn search failed: ${e.message}`);
       }
     }
 
     // 3. Discover Company Website
     if (signals.website && !signals.website.includes('linkedin.com') && !signals.website.includes('github.com')) {
-      companyWebsiteUrl = signals.website;
-    } else {
-      for (const query of companyQueries) {
-        if (companyWebsiteUrl) break;
-        searchQueries.push(query);
-        try {
-          logger.info(`[ProfileDiscoveryEngine] Searching for Company Website using query: "${query}"`);
-          const results = await this.searchAdapter.search(query);
-          for (const res of results) {
-            if (res.url && !res.url.includes('linkedin.com') && !res.url.includes('github.com') && !res.url.includes('wikipedia.org')) {
-              companyWebsiteUrl = res.url;
-              allDiscoveredUrls.push({ url: res.url, source: 'company-website-search' });
-              break;
-            }
+      discoveredCompanyUrls.add(signals.website);
+    }
+    for (const query of companyQueries) {
+      searchQueries.push(query);
+      try {
+        logger.info(`[ProfileDiscoveryEngine] Searching for Company Website using query: "${query}"`);
+        const results = await this.searchAdapter.search(query);
+        trackSearchProviderResults(results);
+
+        for (const res of results) {
+          if (res.url && !res.url.includes('linkedin.com') && !res.url.includes('github.com') && !res.url.includes('wikipedia.org')) {
+            discoveredCompanyUrls.add(res.url);
+            allDiscoveredUrls.push({ url: res.url, source: 'company-website-search' });
           }
-        } catch (e: any) {
-          logger.warn(`[ProfileDiscoveryEngine] Company Web Search query failed: ${e.message}`);
         }
+      } catch (e: any) {
+        logger.warn(`[ProfileDiscoveryEngine] Company Web Search query failed: ${e.message}`);
       }
     }
 
-    // 4. Discover GitHub URL
+    // 4. Discover GitHub URLs
     for (const query of githubQueries) {
-      if (githubUrl) break;
       searchQueries.push(query);
       try {
         logger.info(`[ProfileDiscoveryEngine] Searching for GitHub URL using query: "${query}"`);
         const results = await this.searchAdapter.search(query);
+        trackSearchProviderResults(results);
+
         for (const res of results) {
           if (res.url.includes('github.com/') && !res.url.includes('/search') && !res.url.includes('/topics')) {
-            githubUrl = res.url;
+            discoveredGitHubUrls.add(res.url);
             allDiscoveredUrls.push({ url: res.url, source: 'github-url-search' });
-            break;
           }
         }
       } catch (e: any) {
@@ -176,52 +175,73 @@ export class ProfileDiscoveryEngine {
       }
     }
 
-    // ─── Parallel Ingestions / BeautifulSoup Parsers ──────────────────────────
-    logger.info(`[ProfileDiscoveryEngine] Executing stage: Evidence Collection & BeautifulSoup Parsing`);
-
-    const githubPromise = githubUrl ?
-      this.fetchGitHubDetails(githubUrl).catch(e => {
-        logger.error(`[ProfileDiscoveryEngine] GitHub Collector failure for ${githubUrl}: ${e.message}`);
-        rejectionReasons.push(`GitHub Collector URL "${githubUrl}" error: ${e.message}`);
-        return null;
-      }) : Promise.resolve(null);
-
-    const companyWebPromise = companyWebsiteUrl ?
-      this.scrapeCompanyWebsite(companyWebsiteUrl, signals.name).catch(e => {
-        logger.error(`[ProfileDiscoveryEngine] Cheerio Web Scraper failure for ${companyWebsiteUrl}: ${e.message}`);
-        rejectionReasons.push(`Company Web Parser URL "${companyWebsiteUrl}" error: ${e.message}`);
-        return null;
-      }) : Promise.resolve(null);
-
-    // Also search other portfolios or personal sites from general queries if available
-    let portfolioData = null;
+    // 5. Discover Portfolios
     if (signals.name) {
       const portQuery = `"${signals.name}" portfolio OR personal website`;
+      searchQueries.push(portQuery);
       try {
         logger.info(`[ProfileDiscoveryEngine] Searching for Portfolios using query: "${portQuery}"`);
         const results = await this.searchAdapter.search(portQuery);
-        const bestPortUrl = results.find(res => !res.url.includes('linkedin.com') && !res.url.includes('github.com') && !res.url.includes('wikipedia.org'))?.url;
-        if (bestPortUrl) {
-          logger.info(`[ProfileDiscoveryEngine] Found Candidate Portfolio URL: ${bestPortUrl}. Scraping...`);
-          portfolioData = await this.scrapePortfolio(bestPortUrl).catch(e => {
-            logger.error(`[ProfileDiscoveryEngine] Portfolio Parser failure for ${bestPortUrl}: ${e.message}`);
-            return null;
-          });
+        trackSearchProviderResults(results);
+
+        for (const res of results) {
+          if (res.url && !res.url.includes('linkedin.com') && !res.url.includes('github.com') && !res.url.includes('wikipedia.org')) {
+            discoveredPortfolioUrls.add(res.url);
+          }
         }
       } catch (e: any) {
         logger.warn(`[ProfileDiscoveryEngine] Portfolio discovery query failed: ${e.message}`);
       }
     }
 
-    const [githubData, companyWebData] = await Promise.all([
-      githubPromise,
-      companyWebPromise
+    // ─── Parallel Ingestions / BeautifulSoup Parsers ──────────────────────────
+    logger.info(`[ProfileDiscoveryEngine] Executing stage: Evidence Collection & BeautifulSoup Parsing`);
+
+    // Fetch GitHub Details for up to 3 candidates
+    const githubUrlsList = Array.from(discoveredGitHubUrls).slice(0, 3);
+    const githubPromises = githubUrlsList.map(url =>
+      this.fetchGitHubDetails(url).catch(e => {
+        logger.error(`[ProfileDiscoveryEngine] GitHub Collector failure for ${url}: ${e.message}`);
+        rejectionReasons.push(`GitHub Collector URL "${url}" error: ${e.message}`);
+        return null;
+      })
+    );
+
+    // Scrape Company Websites for up to 2 candidates
+    const companyUrlsList = Array.from(discoveredCompanyUrls).slice(0, 2);
+    const companyWebPromises = companyUrlsList.map(url =>
+      this.scrapeCompanyWebsite(url, signals.name).catch(e => {
+        logger.error(`[ProfileDiscoveryEngine] Cheerio Web Scraper failure for ${url}: ${e.message}`);
+        rejectionReasons.push(`Company Web Parser URL "${url}" error: ${e.message}`);
+        return null;
+      })
+    );
+
+    // Scrape Portfolios for up to 2 candidates
+    const portfolioUrlsList = Array.from(discoveredPortfolioUrls).slice(0, 2);
+    const portfolioPromises = portfolioUrlsList.map(url =>
+      this.scrapePortfolio(url).catch(e => {
+        logger.error(`[ProfileDiscoveryEngine] Portfolio Parser failure for ${url}: ${e.message}`);
+        rejectionReasons.push(`Portfolio Scraper URL "${url}" error: ${e.message}`);
+        return null;
+      })
+    );
+
+    const [githubDataArray, companyWebDataArray, portfolioDataArray] = await Promise.all([
+      Promise.all(githubPromises),
+      Promise.all(companyWebPromises),
+      Promise.all(portfolioPromises)
     ]);
+
+    // Update searchProcess logs with API scraper details
+    searchProcess["GitHub API"] = `${githubDataArray.filter(Boolean).length} Results`;
+    searchProcess["Company Website"] = `${companyWebDataArray.filter(Boolean).length} Results`;
 
     const candidates: CandidateProfile[] = [];
 
-    // Step 6: Add LinkedIn stub (Do NOT scrape)
-    if (linkedInUrl) {
+    // Step 6: Add LinkedIn candidates (Do NOT scrape)
+    const linkedinUrlsList = Array.from(discoveredLinkedInUrls).slice(0, 5);
+    for (const url of linkedinUrlsList) {
       candidates.push({
         fullName: signals.name,
         company: signals.company || undefined,
@@ -230,15 +250,17 @@ export class ProfileDiscoveryEngine {
         education: [],
         skills: [],
         projects: [],
-        publicProfiles: [{ platform: 'LinkedIn', url: linkedInUrl }],
+        publicProfiles: [{ platform: 'LinkedIn', url }],
         source: 'LinkedIn URL Discovery',
-        sourceConfidence: linkedinConfidence,
-        verificationStatus: linkedinVerificationStatus
+        sourceConfidence: 80,
+        verificationStatus: 'Unverified'
       });
     }
 
     // Step 7: Add GitHub candidate data
-    if (githubData) {
+    for (let idx = 0; idx < githubDataArray.length; idx++) {
+      const githubData = githubDataArray[idx];
+      if (!githubData) continue;
       candidates.push({
         fullName: githubData.name || signals.name,
         company: githubData.company?.replace('@', '').trim() || signals.company || undefined,
@@ -267,7 +289,10 @@ export class ProfileDiscoveryEngine {
     }
 
     // Step 8: Add Company website candidate details
-    if (companyWebData) {
+    for (let idx = 0; idx < companyWebDataArray.length; idx++) {
+      const companyWebData = companyWebDataArray[idx];
+      if (!companyWebData) continue;
+      const url = companyUrlsList[idx];
       candidates.push({
         fullName: signals.name,
         company: signals.company || companyWebData.companyName || undefined,
@@ -279,7 +304,7 @@ export class ProfileDiscoveryEngine {
         education: [],
         skills: [],
         projects: [],
-        publicProfiles: companyWebsiteUrl ? [{ platform: 'Company Website', url: companyWebsiteUrl }] : [],
+        publicProfiles: [{ platform: 'Company Website', url }],
         source: 'Company Website',
         sourceConfidence: 90,
         verificationStatus: 'Verified'
@@ -287,14 +312,17 @@ export class ProfileDiscoveryEngine {
     }
 
     // Step 9: Add Portfolio website candidate details
-    if (portfolioData) {
+    for (let idx = 0; idx < portfolioDataArray.length; idx++) {
+      const portfolioData = portfolioDataArray[idx];
+      if (!portfolioData) continue;
+      const url = portfolioUrlsList[idx];
       candidates.push({
         fullName: signals.name,
         experience: portfolioData.experience || [],
         education: portfolioData.education || [],
         skills: portfolioData.skills || [],
         projects: portfolioData.projects || [],
-        publicProfiles: portfolioData.socialLinks?.map((url: string) => ({ platform: 'Social', url })) || [],
+        publicProfiles: [{ platform: 'Portfolio', url }, ...(portfolioData.socialLinks?.map((url: string) => ({ platform: 'Social', url })) || [])],
         technologies: portfolioData.technologies || [],
         source: 'Portfolio Scraper',
         sourceConfidence: 85,
@@ -304,12 +332,13 @@ export class ProfileDiscoveryEngine {
 
     return {
       candidates,
-      linkedInUrl,
-      githubUrl,
-      companyWebsiteUrl,
+      linkedInUrl: linkedinUrlsList[0] || null,
+      githubUrl: githubUrlsList[0] || null,
+      companyWebsiteUrl: companyUrlsList[0] || null,
       searchQueries,
       allDiscoveredUrls,
-      rejectionReasons
+      rejectionReasons,
+      searchProcess
     };
   }
 

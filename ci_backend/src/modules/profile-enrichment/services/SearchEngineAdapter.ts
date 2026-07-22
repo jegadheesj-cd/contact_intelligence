@@ -10,6 +10,8 @@ export interface SearchResult {
 }
 
 export class SearchEngineAdapter {
+  public lastProviderUsed: string = 'DuckDuckGo Scraper';
+
   /**
    * Performs query search using configured search provider, falling back to next options or scraper.
    */
@@ -72,6 +74,7 @@ export class SearchEngineAdapter {
   }
 
   private async searchBrave(query: string): Promise<SearchResult[]> {
+    this.lastProviderUsed = 'Brave Search';
     const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}`;
     const response = await fetch(url, {
       headers: {
@@ -102,6 +105,7 @@ export class SearchEngineAdapter {
   }
 
   private async searchGoogleCustom(query: string): Promise<SearchResult[]> {
+    this.lastProviderUsed = 'Google Custom Search';
     const cx = env.GOOGLE_SEARCH_CX || '';
     const key = env.GOOGLE_SEARCH_API_KEY || '';
     const url = `https://customsearch.googleapis.com/customsearch/v1?cx=${encodeURIComponent(cx)}&key=${encodeURIComponent(key)}&q=${encodeURIComponent(query)}`;
@@ -129,6 +133,7 @@ export class SearchEngineAdapter {
   }
 
   private async searchBing(query: string): Promise<SearchResult[]> {
+    this.lastProviderUsed = 'Bing Search';
     const url = `https://api.bing.microsoft.com/v7.0/search?q=${encodeURIComponent(query)}`;
     const response = await fetch(url, {
       headers: {
@@ -158,6 +163,7 @@ export class SearchEngineAdapter {
   }
 
   private async searchFallback(query: string): Promise<SearchResult[]> {
+    this.lastProviderUsed = 'DuckDuckGo Scraper';
     try {
       const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
       const response = await fetch(url, {
@@ -207,6 +213,7 @@ export class SearchEngineAdapter {
   }
 
   private async searchTavily(query: string): Promise<SearchResult[]> {
+    this.lastProviderUsed = 'Tavily Search';
     const url = 'https://api.tavily.com/search';
     const response = await fetch(url, {
       method: 'POST',

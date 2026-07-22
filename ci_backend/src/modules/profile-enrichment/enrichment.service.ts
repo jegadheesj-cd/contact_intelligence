@@ -111,32 +111,63 @@ export class ProfileEnrichmentService {
       };
     }
 
-    // Step 2: Verification — find best-verified candidate (used for primary contact matching)
-    let bestCandidate: CandidateProfile | null = null;
-    let bestVerification: any = { isVerified: false, confidence: 0, reasons: [] };
-
-    for (const candidate of candidates) {
+    // Step 2: Rank every candidate using weighted scoring
+    const rankedCandidates = candidates.map(candidate => {
       const verifResult = verificationEngine.verify(context, candidate);
-      logger.info(`[DiscoveryPipeline] Verification for ${candidate.source} (${candidate.fullName}): ${verifResult.confidence}% — ${verifResult.isVerified ? 'VERIFIED' : 'REJECTED'}`);
-      if (verifResult.confidence > bestVerification.confidence) {
-        bestCandidate = candidate;
-        bestVerification = verifResult;
-      }
-    }
+      return {
+        ...candidate,
+        sourceConfidence: verifResult.confidence,
+        verificationStatus: verifResult.isVerified ? 'Verified' : 'No verified professional profile found',
+        verificationReasons: verifResult.reasons
+      };
+    });
 
-    // Prepare provider responses for ALL candidates (not just the best)
-    const providersUsed = Array.from(new Set(candidates.map(c => c.source)));
-    const providerResponses: ProviderResponse[] = candidates.map(c => ({
+    // Sort all candidates by confidence descending
+    rankedCandidates.sort((a, b) => b.sourceConfidence - a.sourceConfidence);
+
+    const acceptedCandidates = rankedCandidates.filter(c => c.sourceConfidence >= 70);
+    const rejectedCandidates = rankedCandidates.filter(c => c.sourceConfidence < 70);
+
+    logger.info(`[DiscoveryPipeline] ─── Candidate Ranking Summary ───`);
+    logger.info(`[DiscoveryPipeline] Total Discovered Candidates: ${rankedCandidates.length}`);
+    for (const c of rankedCandidates) {
+      logger.info(`[DiscoveryPipeline]   Candidate: ${c.fullName} | Source: ${c.source} | Confidence: ${c.sourceConfidence}% | Status: ${c.verificationStatus}`);
+      logger.info(`[DiscoveryPipeline]   Reasons: ${(c as any).verificationReasons.join('; ')}`);
+    }
+    logger.info(`[DiscoveryPipeline] Accepted Candidates: ${acceptedCandidates.length}`);
+    logger.info(`[DiscoveryPipeline] Rejected Candidates: ${rejectedCandidates.length}`);
+
+    // Prepare provider responses for ALL candidates (sorted by confidence descending)
+    const providersUsed = Array.from(new Set(rankedCandidates.map(c => c.source)));
+    const providerResponses: ProviderResponse[] = rankedCandidates.map(c => ({
       sourceName: c.source,
       confidence: c.sourceConfidence,
       data: c
     }));
+
+    const bestCandidate = rankedCandidates[0] || null;
+    const bestVerification = bestCandidate ? {
+      isVerified: bestCandidate.sourceConfidence >= 70,
+      confidence: bestCandidate.sourceConfidence,
+      reasons: (bestCandidate as any).verificationReasons || []
+    } : { isVerified: false, confidence: 0, reasons: ['No candidates discovered'] };
 
     logger.info(`[DiscoveryPipeline] Best candidate: ${bestCandidate ? bestCandidate.source : 'None'} — ${bestVerification.confidence}%`);
 
     // Step 3: Merge ALL provider responses together (LinkedIn + GitHub + CompanyWeb)
     logger.info(`[DiscoveryPipeline] Executing stage: Merge Service`);
     const { mergedProfile, sourceAttribution } = mergeService.mergeProfiles(providerResponses);
+
+    // Save searchProcess inside mergedProfile and sourceAttribution
+    const timestamp = new Date().toISOString();
+    mergedProfile.searchProcess = {
+      value: discoveryResult.searchProcess || {},
+      source: 'Pipeline Log',
+      confidence: 100,
+      timestamp,
+      verification: 'Verified'
+    };
+    sourceAttribution.searchProcess = mergedProfile.searchProcess;
 
     logger.info(`[DiscoveryPipeline] ─── Merged Profile ───`);
     logger.info(`[DiscoveryPipeline] fullName: ${mergedProfile.fullName?.value}`);

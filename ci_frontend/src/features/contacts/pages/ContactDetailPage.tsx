@@ -31,6 +31,10 @@ import {
   Award,
   Info,
   Loader2,
+  Search,
+  Users,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react';
 
 export const ContactDetailPage: React.FC = () => {
@@ -221,6 +225,131 @@ export const ContactDetailPage: React.FC = () => {
         <span className={`h-1.5 w-1.5 rounded-full ${fieldObj.verification === 'Verified' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
         {fieldObj.source} ({fieldObj.confidence}%)
       </span>
+    );
+  };
+  const renderSearchProcess = () => {
+    const searchProcess = contact.professionalProfile?.mergedProfile?.searchProcess?.value || 
+                          contact.professionalProfile?.sourceAttribution?.searchProcess?.value;
+    if (!searchProcess || Object.keys(searchProcess).length === 0) return null;
+
+    return (
+      <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <Search className="h-4 w-4 text-slate-500" />
+          <h4 className="text-xs font-black text-slate-700 uppercase tracking-widest">Search Engine Query Log</h4>
+        </div>
+        <p className="text-[11px] text-slate-400 font-medium">
+          Timeline of multi-source queries executed by the Professional Intelligence Engine.
+        </p>
+        <div className="relative border-l border-slate-200 ml-3 pl-6 space-y-4 py-2">
+          {Object.entries(searchProcess).map(([provider, results]: any, idx) => {
+            const hasResult = results && !results.includes('0 Results') && !results.includes('Disabled');
+            return (
+              <div key={idx} className="relative">
+                <span className={`absolute -left-[31px] top-0.5 rounded-full p-1 border shadow-sm
+                  ${hasResult ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-slate-50 border-slate-200 text-slate-400'}`}
+                >
+                  {hasResult ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                </span>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-black text-slate-800">{provider}</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border
+                    ${hasResult ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-50 text-slate-500 border-slate-200'}`}
+                  >
+                    {results}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const renderDiscoveredCandidates = () => {
+    const responses = contact.professionalProfile?.providerResponses;
+    if (!responses || !Array.isArray(responses) || responses.length === 0) return null;
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-indigo-500" />
+          <h4 className="text-xs font-black text-slate-700 uppercase tracking-widest">Discovered Candidates ({responses.length})</h4>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {responses.map((resp: any, idx: number) => {
+            const cand = resp.data;
+            const isBest = idx === 0 && resp.confidence >= 70;
+            const linkedin = cand.publicProfiles?.find((p: any) => p.platform === 'LinkedIn')?.url;
+            const github = cand.publicProfiles?.find((p: any) => p.platform === 'GitHub')?.url;
+            const portfolio = cand.publicProfiles?.find((p: any) => p.platform === 'Portfolio' || p.platform === 'Social' || p.platform === 'Company Website')?.url;
+
+            return (
+              <div key={idx} className={`p-5 rounded-2xl border transition-all duration-300 shadow-sm flex flex-col justify-between
+                ${isBest 
+                  ? 'bg-gradient-to-br from-indigo-50/50 via-white to-white border-indigo-200 shadow-indigo-100/40 ring-1 ring-indigo-50' 
+                  : 'bg-white border-slate-100 hover:border-slate-200'}`}
+              >
+                <div>
+                  <div className="flex justify-between items-start gap-2 mb-2">
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide border
+                      ${cand.verificationStatus === 'Verified' || resp.confidence >= 70
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                        : 'bg-slate-50 text-slate-500 border-slate-200'}`}
+                    >
+                      {cand.verificationStatus || 'Unverified'}
+                    </span>
+                    <span className={`text-xs font-black px-2 py-0.5 rounded-full border
+                      ${resp.confidence >= 70 ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-slate-50 text-slate-600 border-slate-100'}`}
+                    >
+                      {resp.confidence}% Confidence
+                    </span>
+                  </div>
+                  
+                  <h5 className="text-sm font-black text-slate-800 flex items-center">
+                    {cand.fullName || contact.name}
+                    {isBest && (
+                      <span className="ml-1.5 inline-flex px-1.5 py-0.5 bg-indigo-600 text-white rounded text-[8px] font-black uppercase tracking-wide">
+                        Best Match
+                      </span>
+                    )}
+                  </h5>
+                  <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
+                    {cand.designation || cand.headline || 'Professional Profile'}
+                  </p>
+                  {cand.company && (
+                    <p className="text-[10px] text-slate-500 font-bold mt-1.5 uppercase tracking-wide">
+                      Company: {cand.company}
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-5 pt-4 border-t border-slate-100/70 flex items-center gap-3">
+                  {linkedin && (
+                    <a href={linkedin} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-indigo-600 hover:underline">
+                      LinkedIn
+                    </a>
+                  )}
+                  {github && (
+                    <a href={github} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-slate-700 hover:underline">
+                      GitHub
+                    </a>
+                  )}
+                  {portfolio && (
+                    <a href={portfolio} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-emerald-600 hover:underline">
+                      Portfolio/Web
+                    </a>
+                  )}
+                  <span className="ml-auto text-[9px] font-medium text-slate-400">
+                    via {resp.sourceName}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     );
   };
 
@@ -509,14 +638,17 @@ export const ContactDetailPage: React.FC = () => {
             {activeTab === 'intelligence' && (
               <div className="space-y-8 animate-fade-in text-slate-800">
                 {!aiProfile && !aiParsedSummary && !isPipelineActive ? (
-                  <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-slate-100 rounded-xl">
-                    <div className="p-4 bg-purple-50 rounded-full mb-4">
-                      <Cpu className="h-8 w-8 text-purple-500 animate-pulse" />
+                  <div className="space-y-6">
+                    <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-slate-100 rounded-xl">
+                      <div className="p-4 bg-purple-50 rounded-full mb-4">
+                        <Cpu className="h-8 w-8 text-purple-500 animate-pulse" />
+                      </div>
+                      <h3 className="text-sm font-bold text-slate-800">No Verified Profile Found</h3>
+                      <p className="text-xs text-slate-500 mt-2 max-w-sm">
+                        We could not find a highly confident match for this contact. Trigger the pipeline again or verify their details.
+                      </p>
                     </div>
-                    <h3 className="text-sm font-bold text-slate-800">No Verified Profile Found</h3>
-                    <p className="text-xs text-slate-500 mt-2 max-w-sm">
-                      We could not find a highly confident match for this contact. Trigger the pipeline again or verify their details.
-                    </p>
+                    {renderSearchProcess()}
                   </div>
                 ) : isPipelineActive ? (
                   <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-slate-100 rounded-xl">
@@ -1014,6 +1146,16 @@ export const ContactDetailPage: React.FC = () => {
                         </div>
                       </div>
                     )}
+
+                    {/* Discovered Candidates */}
+                    <div className="border-t border-slate-100 pt-6">
+                      {renderDiscoveredCandidates()}
+                    </div>
+
+                    {/* Search Process Timeline */}
+                    <div className="border-t border-slate-100 pt-6">
+                      {renderSearchProcess()}
+                    </div>
                   </div>
                 </>
                 )}

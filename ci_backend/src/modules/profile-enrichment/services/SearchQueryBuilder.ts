@@ -37,6 +37,14 @@ export class SearchQueryBuilder {
       queries.push(`"${name}" github`);
       queries.push(name); // Plain name fallback
     }
+    if (signals.companyDomain) {
+      queries.push(`site:github.com "${signals.companyDomain}"`);
+      queries.push(`"${signals.companyDomain}" github`);
+    }
+    if (signals.website) {
+      queries.push(`site:github.com "${signals.website}"`);
+      queries.push(`"${signals.website}" github`);
+    }
     return queries;
   }
 
