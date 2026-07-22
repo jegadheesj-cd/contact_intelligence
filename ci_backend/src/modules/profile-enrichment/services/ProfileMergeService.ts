@@ -26,7 +26,7 @@ export interface MergedProfile {
   publications?: VerifiedField<string[]>;
   languages?: VerifiedField<string[]>;
   interests?: VerifiedField<string[]>;
-  publicProfiles: VerifiedField<Array<{ platform: string; url: string }>>;
+  publicProfiles: VerifiedField<Array<{ platform: string; url: string; confidence?: number; reasons?: string[] }>>;
   // GitHub-specific
   repositories?: VerifiedField<Array<{ name: string; description: string; language: string; stars: number; forks: number; url: string; topics?: string[] }>>;
   pinnedRepositories?: VerifiedField<Array<{ name: string; description: string; language: string; stars: number; url: string }>>;

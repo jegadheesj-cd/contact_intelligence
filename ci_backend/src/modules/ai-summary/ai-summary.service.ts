@@ -66,7 +66,7 @@ export class AiSummaryService {
       const tagsList = contact.tags.map(t => t.name).join(', ');
 
       const prompt = `You are a strict Professional Analyst and Executive Assistant.
-Your task is to analyze the following profile data and extract key insights.
+Your task is to analyze the following profile data and extract key insights for an enterprise contact intelligence platform.
 You must ONLY use the provided input. Do NOT invent, guess, or hallucinate information. If the information is not present in the input, leave it empty or omit it.
 
 INPUT DATA:
@@ -81,10 +81,10 @@ ${verifiedProfile ? JSON.stringify(verifiedProfile) : 'No profile data available
 
 Output ONLY a valid JSON object matching this exact format:
 {
-  "executiveSummary": "A concise professional background summary (2-3 sentences).",
+  "executiveSummary": "A concise professional background summary including Areas of Expertise, Technologies, Industry Focus, and Career Highlights.",
   "careerHighlights": ["Highlight 1", "Highlight 2"],
-  "conversationStarters": ["Starter Idea 1", "Starter Idea 2"],
-  "meetingPreparation": "A brief overview preparing for a meeting with them.",
+  "conversationStarters": ["Specific Technical Starter", "Specific Professional Starter"],
+  "meetingPreparation": "A brief overview preparing for a meeting including Company information, Recent technologies, Technical interests, and Professional interests.",
   "professionalStrengths": ["Strength 1", "Strength 2"],
   "networkingSuggestions": "Suggestions on how to build a professional relationship with them.",
   "decisionMakerExplanation": "Explanation of why they are or are not a decision maker based on designation/role."

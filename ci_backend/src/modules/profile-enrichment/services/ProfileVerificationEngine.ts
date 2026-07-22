@@ -11,13 +11,13 @@ export interface VerificationResult {
 export class ProfileVerificationEngine {
   /**
    * Verifies that the discovered candidate profile matches the target OCR contact.
-   * Uses exact weighted matching weights:
-   * - Email Domain / Match: 40%
-   * - Company: 25%
-   * - Designation: 15%
-   * - Website Domain: 10%
-   * - Location: 5%
-   * - Name Similarity: 5%
+   * Uses weighted exact matching:
+   * - Name Match: 35%
+   * - Email / Phone Match: 25%
+   * - Company Match: 20%
+   * - Website Match: 10%
+   * - Location Match: 5%
+   * - Designation Match: 5%
    */
   public verify(
     ocrContact: {
@@ -36,7 +36,6 @@ export class ProfileVerificationEngine {
     let totalScore = 0;
     const reasons: string[] = [];
 
-    // Helper to extract email domain
     const getEmailDomain = (emailStr: string | null | undefined): string | null => {
       if (!emailStr) return null;
       const parts = emailStr.toLowerCase().split('@');
@@ -46,7 +45,6 @@ export class ProfileVerificationEngine {
       return ignored.includes(domain) ? null : domain;
     };
 
-    // Helper to extract website domain
     const getWebsiteDomain = (urlStr: string | null | undefined): string | null => {
       if (!urlStr) return null;
       try {
@@ -63,106 +61,138 @@ export class ProfileVerificationEngine {
       }
     };
 
-    // 1. Name Similarity Match (Weight: 5)
-    const nameSim = stringSimilarity(ocrContact.name.toLowerCase(), candidate.fullName.toLowerCase());
-    const namePoints = Math.round(nameSim * 5 * 10) / 10;
-    totalScore += namePoints;
-    reasons.push(`Name Similarity: ${(nameSim * 100).toFixed(0)}% (weighted: ${namePoints}/5)`);
+    const getUsername = (urlStr: string | null | undefined): string | null => {
+      if (!urlStr) return null;
+      const match = urlStr.match(/([^\/]+)\/?$/);
+      return match ? match[1].split('?')[0].toLowerCase() : null;
+    };
 
-    // 2. Email Match / Email Domain Match (Weight: 40)
-    if (ocrContact.email) {
-      let emailPoints = 0;
-      const ocrDomain = getEmailDomain(ocrContact.email);
-      
-      // Check if email matches any public profiles/text/stubs
-      if (candidate.publicProfiles.some(p => p.url.toLowerCase().includes(ocrContact.email!.toLowerCase()))) {
-        emailPoints = 40;
-        reasons.push(`Email Match: Direct email match found in public profile URL (weighted: 40/40)`);
-      } else if (ocrDomain && candidate.company && candidate.company.toLowerCase().includes(ocrDomain.split('.')[0])) {
-        emailPoints = 32;
-        reasons.push(`Email Match: Domain "${ocrDomain}" aligns with candidate company "${candidate.company}" (weighted: 32/40)`);
-      } else {
-        emailPoints = 8;
-        reasons.push(`Email Match: Email present but mismatch with candidate company/metadata (weighted: 8/40)`);
-      }
-      totalScore += emailPoints;
+    const candidateStr = JSON.stringify(candidate).toLowerCase();
+    
+    // --- HIGHEST WEIGHT (60%) ---
+
+    // 1. Name Match (Weight: 30)
+    const nameSim = stringSimilarity(ocrContact.name.toLowerCase(), candidate.fullName.toLowerCase());
+    const namePoints = Math.round(nameSim * 30 * 10) / 10;
+    totalScore += namePoints;
+    if (nameSim > 0.8) {
+      reasons.push(`✔ Name Match`);
     } else {
-      totalScore += 20; // Neutral average score when ocr does not have email
-      reasons.push(`Email Match: Email not present in OCR (+20 neutral)`);
+      reasons.push(`Name Similarity: ${(nameSim * 100).toFixed(0)}%`);
     }
 
-    // 3. Company Match (Weight: 25)
+    // 2. Email / Phone Match (Weight: 20) & Email Domain Match (Weight: 10)
+    if (ocrContact.email || ocrContact.phone) {
+      const ocrDomain = getEmailDomain(ocrContact.email);
+      let matchedEmailPhone = false;
+      let matchedEmailDomain = false;
+      
+      if (ocrContact.email && candidateStr.includes(ocrContact.email.toLowerCase())) matchedEmailPhone = true;
+      if (ocrContact.phone && candidateStr.includes(ocrContact.phone.replace(/[^0-9]/g, ''))) matchedEmailPhone = true;
+      
+      if (ocrDomain && candidate.company && candidate.company.toLowerCase().includes(ocrDomain.split('.')[0])) matchedEmailDomain = true;
+      if (ocrDomain && candidate.publicProfiles.some(p => p.url.toLowerCase().includes(ocrDomain))) matchedEmailDomain = true;
+      
+      if (matchedEmailPhone) {
+        totalScore += 20;
+        reasons.push(`✔ Exact ${ocrContact.email && candidateStr.includes(ocrContact.email.toLowerCase()) ? 'Email' : 'Phone'} Match`);
+      } else {
+        reasons.push(`✖ No Exact Email/Phone Match`);
+      }
+
+      if (matchedEmailDomain) {
+        totalScore += 10;
+        reasons.push(`✔ Email Domain`);
+      } else {
+        reasons.push(`✖ No Email Domain Match`);
+      }
+    } else {
+      totalScore += 15; // Neutral average score
+    }
+
+    // --- HIGH WEIGHT (25%) ---
+
+    // 3. Company Match (Weight: 15)
     if (ocrContact.company) {
       let bestCompSim = 0;
-      if (candidate.company) {
-        bestCompSim = Math.max(bestCompSim, stringSimilarity(ocrContact.company.toLowerCase(), candidate.company.toLowerCase()));
+      const ocrCompany = ocrContact.company; // Store in local variable to satisfy TypeScript
+      if (candidate.company) bestCompSim = Math.max(bestCompSim, stringSimilarity(ocrCompany.toLowerCase(), candidate.company.toLowerCase()));
+      if (candidate.experience) {
+        candidate.experience.forEach(exp => {
+          if (exp.company) bestCompSim = Math.max(bestCompSim, stringSimilarity(ocrCompany.toLowerCase(), exp.company.toLowerCase()));
+        });
       }
-      if (candidate.experience && candidate.experience.length > 0) {
-        for (const exp of candidate.experience) {
-          if (exp.company) {
-            bestCompSim = Math.max(bestCompSim, stringSimilarity(ocrContact.company.toLowerCase(), exp.company.toLowerCase()));
-          }
-        }
-      }
-      const compPoints = Math.round(bestCompSim * 25 * 10) / 10;
+      const compPoints = Math.round(bestCompSim * 15 * 10) / 10;
       totalScore += compPoints;
-      reasons.push(`Company Match: ${(bestCompSim * 100).toFixed(0)}% (weighted: ${compPoints}/25)`);
-    } else {
-      totalScore += 12.5;
-      reasons.push(`Company Match: Company not present in OCR (+12.5 neutral)`);
-    }
-
-    // 4. Website Domain Match (Weight: 10)
-    if (ocrContact.website) {
-      let webPoints = 0;
-      const ocrWebDomain = getWebsiteDomain(ocrContact.website);
-      const candidateWebDomain = candidate.publicProfiles.length > 0 ? getWebsiteDomain(candidate.publicProfiles[0].url) : null;
       
-      if (ocrWebDomain && candidateWebDomain && ocrWebDomain === candidateWebDomain) {
-        webPoints = 10;
-        reasons.push(`Website Match: Perfect website domain match "${ocrWebDomain}" (weighted: 10/10)`);
-      } else if (ocrWebDomain && candidate.company && candidate.company.toLowerCase().includes(ocrWebDomain.split('.')[0])) {
-        webPoints = 8;
-        reasons.push(`Website Match: Domain "${ocrWebDomain}" matches company name "${candidate.company}" (weighted: 8/10)`);
-      } else {
-        webPoints = 3;
-        reasons.push(`Website Match: No website alignment (weighted: 3/10)`);
-      }
-      totalScore += webPoints;
-    } else {
-      totalScore += 5;
-      reasons.push(`Website Match: Website not present in OCR (+5 neutral)`);
-    }
-
-    // 5. Designation Match (Weight: 15)
-    if (ocrContact.designation) {
-      let bestDesigSim = 0;
-      if (candidate.designation) {
-        bestDesigSim = Math.max(bestDesigSim, stringSimilarity(ocrContact.designation.toLowerCase(), candidate.designation.toLowerCase()));
-      }
-      if (candidate.headline) {
-        bestDesigSim = Math.max(bestDesigSim, stringSimilarity(ocrContact.designation.toLowerCase(), candidate.headline.toLowerCase()));
-      }
-      const desigPoints = Math.round(bestDesigSim * 15 * 10) / 10;
-      totalScore += desigPoints;
-      reasons.push(`Designation Match: ${(bestDesigSim * 100).toFixed(0)}% (weighted: ${desigPoints}/15)`);
+      if (bestCompSim > 0.7) reasons.push(`✔ Company Match`);
+      else reasons.push(`✖ Company Mismatch`);
     } else {
       totalScore += 7.5;
-      reasons.push(`Designation Match: Designation not present in OCR (+7.5 neutral)`);
     }
 
-    // 6. Location Match (Weight: 5)
+    // 4. Company Website Match (Weight: 10)
+    if (ocrContact.website) {
+      const ocrWebDomain = getWebsiteDomain(ocrContact.website);
+      let matchedWeb = false;
+      if (ocrWebDomain) {
+        if (candidate.publicProfiles.some(p => getWebsiteDomain(p.url) === ocrWebDomain)) matchedWeb = true;
+        if (candidate.companyBio) matchedWeb = true; 
+      }
+      if (matchedWeb) {
+        totalScore += 10;
+        reasons.push(`✔ Company Website`);
+      } else {
+        reasons.push(`✖ Website Mismatch`);
+      }
+    } else {
+      totalScore += 5;
+    }
+
+    // --- MEDIUM WEIGHT (10%) ---
+
+    // 5. Username Similarity (Weight: 4) & Public Website Match (Weight: 3)
+    let usernamePoints = 0;
+    let socialLinksPoints = 0;
+    if (ocrContact.email) {
+      const emailPrefix = ocrContact.email.split('@')[0].toLowerCase();
+      const usernames = candidate.publicProfiles.map(p => getUsername(p.url)).filter(Boolean) as string[];
+      if (usernames.some(u => u.includes(emailPrefix) || emailPrefix.includes(u))) {
+        usernamePoints = 4;
+        reasons.push(`✔ Username Match`);
+      }
+    }
+    
+    // Cross platform references (Does the candidate link to other known social profiles?)
+    if (candidate.publicProfiles.length > 1) {
+      socialLinksPoints = 3;
+    }
+
+    totalScore += usernamePoints + socialLinksPoints;
+
+    // 6. Location Match (Weight: 3)
     if (ocrContact.address) {
       let locSim = 0;
-      if (candidate.location) {
-        locSim = stringSimilarity(ocrContact.address.toLowerCase(), candidate.location.toLowerCase());
-      }
-      const locPoints = Math.round(locSim * 5 * 10) / 10;
+      if (candidate.location) locSim = stringSimilarity(ocrContact.address.toLowerCase(), candidate.location.toLowerCase());
+      const locPoints = Math.round(locSim * 3 * 10) / 10;
       totalScore += locPoints;
-      reasons.push(`Location Match: ${(locSim * 100).toFixed(0)}% (weighted: ${locPoints}/5)`);
+      if (locSim > 0.6) reasons.push(`✔ Location`);
+    } else {
+      totalScore += 1.5;
+    }
+
+    // --- LOW WEIGHT (5%) ---
+
+    // 7. Designation Similarity (Weight: 5)
+    if (ocrContact.designation) {
+      let bestDesigSim = 0;
+      if (candidate.designation) bestDesigSim = Math.max(bestDesigSim, stringSimilarity(ocrContact.designation.toLowerCase(), candidate.designation.toLowerCase()));
+      if (candidate.headline) bestDesigSim = Math.max(bestDesigSim, stringSimilarity(ocrContact.designation.toLowerCase(), candidate.headline.toLowerCase()));
+      const desigPoints = Math.round(bestDesigSim * 5 * 10) / 10;
+      totalScore += desigPoints;
+      if (bestDesigSim > 0.6) reasons.push(`✔ Designation`);
     } else {
       totalScore += 2.5;
-      reasons.push(`Location Match: Location not present in OCR (+2.5 neutral)`);
     }
 
     const finalScore = Math.min(Math.round(totalScore), 100);

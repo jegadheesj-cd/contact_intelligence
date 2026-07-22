@@ -2,14 +2,17 @@ import { enrichmentQueue } from '../../queue/queue';
 import prisma from '../../config/db';
 import { AppError } from '../../utils/AppError';
 import logger from '../../config/logger';
+import { generateTextWithFallback } from '../../utils/aiClient';
 
 import { ProfileDiscoveryEngine, CandidateProfile } from './services/ProfileDiscoveryEngine';
 import { ProfileVerificationEngine } from './services/ProfileVerificationEngine';
 import { ProfileMergeService, ProviderResponse } from './services/ProfileMergeService';
+import { EnterpriseIdentityResolutionEngine } from './services/EnterpriseIdentityResolutionEngine';
 
 const discoveryEngine = new ProfileDiscoveryEngine();
 const verificationEngine = new ProfileVerificationEngine();
 const mergeService = new ProfileMergeService();
+const identityResolutionEngine = new EnterpriseIdentityResolutionEngine();
 
 export class ProfileEnrichmentService {
   /**
@@ -114,38 +117,49 @@ export class ProfileEnrichmentService {
     // Step 2: Rank every candidate using weighted scoring
     const rankedCandidates = candidates.map(candidate => {
       const verifResult = verificationEngine.verify(context, candidate);
+      // Preserve per-link confidence scores from discovery (e.g. evaluateLinkedInUrlCandidate).
+      // Only fall back to the candidate-level verification score if a link has no pre-set confidence.
+      const updatedPublicProfiles = (candidate.publicProfiles || []).map(p => ({
+        ...p,
+        confidence: p.confidence !== undefined ? p.confidence : verifResult.confidence,
+        reasons: (p.reasons && p.reasons.length > 0) ? p.reasons : verifResult.reasons
+      }));
       return {
         ...candidate,
+        publicProfiles: updatedPublicProfiles,
         sourceConfidence: verifResult.confidence,
         verificationStatus: verifResult.isVerified ? 'Verified' : 'No verified professional profile found',
         verificationReasons: verifResult.reasons
       };
     });
 
-    // Sort all candidates by confidence descending
+    // Sort all candidates by initial confidence descending
     rankedCandidates.sort((a, b) => b.sourceConfidence - a.sourceConfidence);
 
-    const acceptedCandidates = rankedCandidates.filter(c => c.sourceConfidence >= 70);
-    const rejectedCandidates = rankedCandidates.filter(c => c.sourceConfidence < 70);
+    // Step 2.5: Identity Resolution Engine (Re-ranks candidates based on 15 signals + AI)
+    const identityResolvedCandidates = await identityResolutionEngine.resolveIdentities(context, rankedCandidates);
+
+    const acceptedCandidates = identityResolvedCandidates.filter(c => c.sourceConfidence >= 70);
+    const rejectedCandidates = identityResolvedCandidates.filter(c => c.sourceConfidence < 70);
 
     logger.info(`[DiscoveryPipeline] ─── Candidate Ranking Summary ───`);
-    logger.info(`[DiscoveryPipeline] Total Discovered Candidates: ${rankedCandidates.length}`);
-    for (const c of rankedCandidates) {
+    logger.info(`[DiscoveryPipeline] Total Discovered Candidates: ${identityResolvedCandidates.length}`);
+    for (const c of identityResolvedCandidates) {
       logger.info(`[DiscoveryPipeline]   Candidate: ${c.fullName} | Source: ${c.source} | Confidence: ${c.sourceConfidence}% | Status: ${c.verificationStatus}`);
       logger.info(`[DiscoveryPipeline]   Reasons: ${(c as any).verificationReasons.join('; ')}`);
     }
     logger.info(`[DiscoveryPipeline] Accepted Candidates: ${acceptedCandidates.length}`);
     logger.info(`[DiscoveryPipeline] Rejected Candidates: ${rejectedCandidates.length}`);
 
-    // Prepare provider responses for ALL candidates (sorted by confidence descending)
-    const providersUsed = Array.from(new Set(rankedCandidates.map(c => c.source)));
-    const providerResponses: ProviderResponse[] = rankedCandidates.map(c => ({
+    // Prepare provider responses for ALL candidates (sorted by final confidence descending)
+    const providersUsed = Array.from(new Set(identityResolvedCandidates.map(c => c.source)));
+    const providerResponses: ProviderResponse[] = identityResolvedCandidates.map(c => ({
       sourceName: c.source,
       confidence: c.sourceConfidence,
       data: c
     }));
 
-    const bestCandidate = rankedCandidates[0] || null;
+    const bestCandidate = identityResolvedCandidates[0] || null;
     const bestVerification = bestCandidate ? {
       isVerified: bestCandidate.sourceConfidence >= 70,
       confidence: bestCandidate.sourceConfidence,
@@ -154,9 +168,40 @@ export class ProfileEnrichmentService {
 
     logger.info(`[DiscoveryPipeline] Best candidate: ${bestCandidate ? bestCandidate.source : 'None'} — ${bestVerification.confidence}%`);
 
-    // Step 3: Merge ALL provider responses together (LinkedIn + GitHub + CompanyWeb)
-    logger.info(`[DiscoveryPipeline] Executing stage: Merge Service`);
-    const { mergedProfile, sourceAttribution } = mergeService.mergeProfiles(providerResponses);
+    // ─── NEW: Identity Contamination Prevention ───
+    // Only merge candidates that are confidently linked to the best candidate.
+    // This prevents merging Saranya (TCS) with Saranya (Cloud Destinations).
+    
+    const linkedResponses = providerResponses.filter(pr => {
+      if (pr.data === bestCandidate) return true;
+      
+      const bestUrls = bestCandidate?.publicProfiles?.map((p: any) => p.url.toLowerCase()) || [];
+      const cUrls = pr.data.publicProfiles?.map((p: any) => p.url.toLowerCase()) || [];
+      
+      // 1. Exact URL Match (They link to the same public profile)
+      if (bestUrls.some((u: string) => cUrls.includes(u))) return true;
+      
+      // 2. Social Graph Link (One profile explicitly references the other)
+      const cStr = JSON.stringify(pr.data).toLowerCase();
+      if (bestUrls.some((u: string) => cStr.includes(u))) return true;
+      
+      const bestStr = JSON.stringify(bestCandidate).toLowerCase();
+      if (cUrls.some((u: string) => bestStr.includes(u))) return true;
+
+      // 3. Perfect Name AND Company match
+      if (bestCandidate?.fullName && bestCandidate?.company &&
+          pr.data.fullName && pr.data.company &&
+          bestCandidate.fullName.toLowerCase() === pr.data.fullName.toLowerCase() &&
+          bestCandidate.company.toLowerCase() === pr.data.company.toLowerCase()) {
+          return true;
+      }
+      
+      return false; // Reject: Belongs to a different person
+    });
+
+    // Step 3: Merge ONLY confidently linked candidates together (LinkedIn + GitHub + CompanyWeb of the SAME person)
+    logger.info(`[DiscoveryPipeline] Executing stage: Merge Service for ${linkedResponses.length} confidently linked profiles`);
+    const { mergedProfile, sourceAttribution } = mergeService.mergeProfiles(linkedResponses);
 
     // Save searchProcess inside mergedProfile and sourceAttribution
     const timestamp = new Date().toISOString();
@@ -180,6 +225,62 @@ export class ProfileEnrichmentService {
     logger.info(`[DiscoveryPipeline] publicProfiles: ${(mergedProfile.publicProfiles?.value || []).map(p => p.platform + ':' + p.url).join(', ')}`);
     logger.info(`[DiscoveryPipeline] companyBio: ${mergedProfile.companyBio?.value ? 'yes' : 'no'}`);
     logger.info(`[DiscoveryPipeline] githubStats: ${mergedProfile.githubStats?.value ? JSON.stringify(mergedProfile.githubStats.value) : 'none'}`);
+
+    // Step 4: Generate Professional Summary from public verified data (ONLY FOR SELECTED CANDIDATE)
+    logger.info(`[DiscoveryPipeline] Executing stage: Professional Summary Generation`);
+    try {
+      // Use ONLY the linked responses
+      const pubBios = linkedResponses.map(p => p.data.headline || p.data.summary || p.data.companyBio).filter(Boolean);
+      const exp = mergedProfile.experience?.value || [];
+      const edu = mergedProfile.education?.value || [];
+      const skills = mergedProfile.skills?.value || [];
+      const repos = mergedProfile.repositories?.value || [];
+      
+      const hasEnoughInfo = pubBios.length > 0 || exp.length > 0 || repos.length > 0;
+      
+      if (hasEnoughInfo && bestCandidate) {
+        const summaryPrompt = `You are an expert professional biographer.
+Generate a concise, professional summary for this person using ONLY the following verified public information.
+DO NOT fabricate or hallucinate any information.
+Write the summary in the third person starting with: "Based on verified public information, ${mergedProfile.fullName?.value || 'this individual'} is..."
+Describe the person, NOT the system. Do NOT output generic sentences about the availability of information.
+
+Information:
+--- Business Card Information ---
+Name: ${contact.name}
+Company: ${contact.company || 'N/A'}
+Designation: ${contact.designation || 'N/A'}
+
+--- Selected Candidate Information & Verified Public Evidence ---
+Name: ${mergedProfile.fullName?.value || 'Unknown'}
+Bios/Headlines: ${JSON.stringify(pubBios)}
+Experience: ${JSON.stringify(exp)}
+Education: ${JSON.stringify(edu)}
+Skills/Tech: ${JSON.stringify(skills)}
+Projects/Repos: ${JSON.stringify(repos)}`;
+
+        const aiSummary = await generateTextWithFallback(summaryPrompt, 'gemini-1.5-pro', 'Professional Summary');
+        mergedProfile.summary = {
+          value: aiSummary.trim(),
+          source: bestCandidate.source,
+          confidence: 95,
+          timestamp: new Date().toISOString(),
+          verification: 'Verified'
+        };
+        sourceAttribution.summary = mergedProfile.summary;
+      } else {
+        mergedProfile.summary = {
+          value: "No verified public professional biography could be generated.",
+          source: 'System',
+          confidence: 100,
+          timestamp: new Date().toISOString(),
+          verification: 'Verified'
+        };
+        sourceAttribution.summary = mergedProfile.summary;
+      }
+    } catch (e: any) {
+      logger.warn(`[DiscoveryPipeline] Failed to generate professional summary: ${e.message}`);
+    }
 
     return {
       providerResponses,

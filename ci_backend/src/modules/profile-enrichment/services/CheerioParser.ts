@@ -221,4 +221,87 @@ export class CheerioParser {
       bio: bio ? bio.slice(0, 300) : undefined,
     };
   }
+
+  /**
+   * Parse publicly accessible social profile pages (Instagram, Facebook, Twitter/X).
+   * Only extracts data available in meta tags and Open Graph markup — no login bypass.
+   */
+  public parseSocialProfilePublic(html: string, platform: string): SocialProfilePublicData {
+    const $ = cheerio.load(html);
+
+    // Extract from Open Graph and meta tags (publicly available on all platforms)
+    const ogTitle = $('meta[property="og:title"]').attr('content') || '';
+    const ogDescription = $('meta[property="og:description"]').attr('content') || '';
+    const ogImage = $('meta[property="og:image"]').attr('content') || '';
+    const ogUrl = $('meta[property="og:url"]').attr('content') || '';
+    const metaDescription = $('meta[name="description"]').attr('content') || '';
+    const pageTitle = $('title').text().trim();
+
+    let username = '';
+    let displayName = '';
+    let bio = ogDescription || metaDescription || '';
+    let website = '';
+    let verified = false;
+    let businessCategory = '';
+
+    if (platform === 'Instagram') {
+      // Instagram public pages: title format is "@username • Instagram photos and videos"
+      // or "Display Name (@username) • Instagram photos and videos"
+      const titleMatch = pageTitle.match(/@([\w.]+)/);
+      if (titleMatch) username = titleMatch[1];
+      const nameMatch = ogTitle.match(/^(.+?)\s*\(@/);
+      displayName = nameMatch ? nameMatch[1].trim() : ogTitle.split('(')[0].trim();
+      // Extract website from bio if present
+      const urlMatch = bio.match(/https?:\/\/[^\s"]+/);
+      if (urlMatch) website = urlMatch[0];
+      // Check for verified in page source
+      if (html.includes('"is_verified":true') || html.includes('verified_badge')) verified = true;
+      // Business category from structured data
+      const catMatch = html.match(/"category_name":"([^"]+)"/);
+      if (catMatch) businessCategory = catMatch[1];
+    } else if (platform === 'Facebook') {
+      // Facebook public pages: title = "Name" or "Name - Page Category"
+      displayName = ogTitle || pageTitle.split(' | ')[0].split(' - ')[0].trim();
+      const fbUrlMatch = ogUrl.match(/facebook\.com\/([^/?]+)/);
+      if (fbUrlMatch) username = fbUrlMatch[1];
+      const urlMatch = bio.match(/https?:\/\/[^\s"]+/);
+      if (urlMatch) website = urlMatch[0];
+      // Business category
+      const pageCat = pageTitle.includes(' - ') ? pageTitle.split(' - ').slice(1).join(' - ').trim() : '';
+      if (pageCat && pageCat.length < 60) businessCategory = pageCat;
+    } else if (platform === 'Twitter' || platform === 'Twitter/X') {
+      // Twitter/X: title format is "Name (@handle) / X"
+      const handleMatch = (ogTitle || pageTitle).match(/@(\w+)/);
+      if (handleMatch) username = handleMatch[1];
+      const tNameMatch = (ogTitle || pageTitle).match(/^(.+?)\s*\(@/);
+      displayName = tNameMatch ? tNameMatch[1].trim() : ogTitle.split('(')[0].trim();
+      // Extract website from description/bio
+      const urlMatch = bio.match(/https?:\/\/[^\s"]+/);
+      if (urlMatch) website = urlMatch[0];
+      // Verified badge
+      if (html.includes('"verified":true') || html.includes('verified_badge') || html.includes('VerifiedBadge')) verified = true;
+    }
+
+    return {
+      username: username || undefined,
+      displayName: displayName || undefined,
+      bio: bio ? bio.slice(0, 300) : undefined,
+      website: website || undefined,
+      verified,
+      businessCategory: businessCategory || undefined,
+      profileImageUrl: ogImage || undefined,
+      profileUrl: ogUrl || undefined,
+    };
+  }
+}
+
+export interface SocialProfilePublicData {
+  username?: string;
+  displayName?: string;
+  bio?: string;
+  website?: string;
+  verified?: boolean;
+  businessCategory?: string;
+  profileImageUrl?: string;
+  profileUrl?: string;
 }

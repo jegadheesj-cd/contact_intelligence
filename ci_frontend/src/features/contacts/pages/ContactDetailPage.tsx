@@ -774,7 +774,7 @@ export const ContactDetailPage: React.FC = () => {
                         {/* Career Timeline */}
                         <div>
                           <h3 className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
-                            <Briefcase className="h-4 w-4 text-indigo-500" /> Career Timeline
+                            <Briefcase className="h-4 w-4 text-indigo-500" /> Career Timeline {renderBadge('experience')}
                           </h3>
                           {aiProfile?.experience && aiProfile.experience.length > 0 ? (
                             <div className="relative border-l-2 border-slate-100 pl-5 ml-2.5 space-y-6">
@@ -794,14 +794,14 @@ export const ContactDetailPage: React.FC = () => {
                               ))}
                             </div>
                           ) : (
-                            <p className="text-xs text-slate-400 italic">No experience history cataloged.</p>
+                            <p className="text-xs text-slate-400 italic">No verified career history available.</p>
                           )}
                         </div>
 
                         {/* Education */}
                         <div className="border-t border-slate-50 pt-5">
                           <h3 className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
-                            <Award className="h-4 w-4 text-purple-500" /> Education
+                            <Award className="h-4 w-4 text-purple-500" /> Education {renderBadge('education')}
                           </h3>
                           {aiProfile?.education && aiProfile.education.length > 0 ? (
                             <div className="relative border-l-2 border-slate-100 pl-5 ml-2.5 space-y-6">
@@ -825,7 +825,7 @@ export const ContactDetailPage: React.FC = () => {
                               ))}
                             </div>
                           ) : (
-                            <p className="text-xs text-slate-400 italic">No education details cataloged.</p>
+                            <p className="text-xs text-slate-400 italic">No verified education information.</p>
                           )}
                         </div>
                       </div>
@@ -834,7 +834,7 @@ export const ContactDetailPage: React.FC = () => {
                       <div className="space-y-6">
                         {/* Verified Skills */}
                         <div>
-                          <h3 className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-3">Verified Skills</h3>
+                          <h3 className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-3 flex items-center gap-2">Verified Skills {renderBadge('skills')}</h3>
                           {contact.skills && contact.skills.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5">
                               {contact.skills.map((skill) => (
@@ -875,13 +875,45 @@ export const ContactDetailPage: React.FC = () => {
                         {/* Public Links */}
                         <div className="border-t border-slate-50 pt-5">
                           <h3 className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-3">Professional Profiles</h3>
-                          <div className="flex flex-wrap gap-2">
-                            {aiProfile?.publicProfiles && aiProfile.publicProfiles.map((p: any, idx: number) => (
-                              <a key={idx} href={p.url} target="_blank" rel="noopener noreferrer" 
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-indigo-50/50 border border-slate-200 hover:border-indigo-200 text-slate-700 hover:text-indigo-800 rounded-lg text-xs font-bold transition-all shadow-sm">
-                                <ExternalLink className="h-3.5 w-3.5 shrink-0" /> {p.platform}
-                              </a>
-                            ))}
+                          <div className="flex flex-wrap gap-2.5">
+                            {aiProfile?.publicProfiles && [...aiProfile.publicProfiles]
+                              .sort((a: any, b: any) => (b.confidence || 0) - (a.confidence || 0))
+                              .map((p: any, idx: number) => {
+                                const conf = p.confidence !== undefined ? p.confidence : 80;
+                                
+                                // Choose color class based on confidence
+                                let badgeColor = 'text-rose-700 bg-rose-50 border-rose-100';
+                                let dotColor = 'bg-rose-500';
+                                if (conf >= 90) {
+                                  badgeColor = 'text-emerald-700 bg-emerald-50 border-emerald-100';
+                                  dotColor = 'bg-emerald-500';
+                                } else if (conf >= 75) {
+                                  badgeColor = 'text-blue-700 bg-blue-50 border-blue-100';
+                                  dotColor = 'bg-blue-500';
+                                } else if (conf >= 60) {
+                                  badgeColor = 'text-amber-700 bg-amber-50 border-amber-100';
+                                  dotColor = 'bg-amber-500';
+                                }
+
+                                // Tooltip text
+                                const tooltipText = p.reasons && Array.isArray(p.reasons)
+                                  ? `Confidence: ${conf}%\nMatched factors:\n${p.reasons.map((r: string) => `✓ ${r.split(':')[0]}`).join('\n')}`
+                                  : `Confidence: ${conf}%`;
+
+                                return (
+                                  <a key={idx} href={p.url} target="_blank" rel="noopener noreferrer" title={tooltipText}
+                                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-700 hover:text-slate-900 rounded-lg text-xs font-bold transition-all shadow-sm group"
+                                  >
+                                    <ExternalLink className="h-3.5 w-3.5 shrink-0 text-slate-400 group-hover:text-slate-600" />
+                                    <span>{p.platform}</span>
+                                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black border ${badgeColor}`}>
+                                      <span className={`h-1.5 w-1.5 rounded-full ${dotColor}`} />
+                                      {conf}%
+                                    </span>
+                                  </a>
+                                );
+                              })
+                            }
                           </div>
                         </div>
                       </div>
