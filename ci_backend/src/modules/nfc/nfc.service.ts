@@ -19,14 +19,25 @@ export class NfcService {
 
     if (finalContactId) {
       // Update existing contact's fields and set source to NFC
+      const cleanData: any = {};
+      if (parsed.name !== undefined) cleanData.name = parsed.name;
+      if (parsed.company !== undefined) cleanData.company = parsed.company;
+      if (parsed.designation !== undefined) cleanData.designation = parsed.designation;
+      if (parsed.email !== undefined) cleanData.email = parsed.email;
+      if (parsed.phone !== undefined) cleanData.phone = parsed.phone;
+      if (parsed.website !== undefined) cleanData.website = parsed.website;
+      if (parsed.address !== undefined) cleanData.address = parsed.address;
+
       await prisma.contact.update({
         where: { id: finalContactId, userId },
         data: {
-          ...parsed,
+          ...cleanData,
           decisionMakerScore: score,
           source: ContactSource.NFC,
         },
-      }).catch(() => {});
+      }).catch((err) => {
+        console.error('Failed to update contact with NFC details:', err);
+      });
     } else {
       // Create new contact from NFC data
       const newContact = await prisma.contact.create({
@@ -57,6 +68,14 @@ export class NfcService {
         contactId: finalContactId,
         payload: payload,
       },
+      include: {
+        contact: {
+          include: {
+            professionalProfile: true,
+            aiSummary: true,
+          }
+        }
+      }
     });
 
     return nfcRecord;
@@ -203,8 +222,16 @@ export function parseAndNormalizeNfc(payload: any): {
   normalized.designation = getValue(['designation', 'title', 'role', 'jobTitle']);
   normalized.email = getValue(['email', 'mail', 'emailAddress']);
   normalized.phone = getValue(['phone', 'tel', 'phoneNumber', 'mobile']);
-  normalized.website = getValue(['website', 'url', 'webAddress']);
+  
+  const web = getValue(['website', 'url', 'webAddress']);
+  const li = getValue(['linkedin_url', 'linkedinUrl', 'linkedin', 'profileUrl', 'profile_url']);
+  normalized.website = web || li || undefined;
+  
   normalized.address = getValue(['address', 'adr', 'location', 'streetAddress']);
+  
+  if (li) {
+    normalized.linkedin_url = li;
+  }
 
   // Clean undefined properties
   Object.keys(normalized).forEach((key) => {

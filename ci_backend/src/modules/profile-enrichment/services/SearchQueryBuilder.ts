@@ -25,14 +25,23 @@ export class SearchQueryBuilder {
     const { name, company, email, phone, website, companyDomain, address } = signals;
 
     if (name) {
-      if (company) queries.push(`site:linkedin.com/in "${name}" "${company}"`);
+      if (company) {
+        queries.push(`site:linkedin.com/in "${name}" "${company}"`);
+        queries.push(`site:linkedin.com/in ${name} "${company}"`);
+      }
       if (email) queries.push(`site:linkedin.com/in "${name}" "${email}"`);
       if (phone) queries.push(`site:linkedin.com/in "${name}" "${phone}"`);
-      if (companyDomain) queries.push(`site:linkedin.com/in "${name}" "${companyDomain}"`);
+      if (companyDomain) {
+        queries.push(`site:linkedin.com/in "${name}" "${companyDomain}"`);
+        queries.push(`site:linkedin.com/in ${name} "${companyDomain}"`);
+      }
       if (website) queries.push(`site:linkedin.com/in "${name}" "${website}"`);
       if (address) queries.push(`site:linkedin.com/in "${name}" "${address}"`);
       
-      queries.push(`site:linkedin.com/in "${name}"`);
+      if (!company) {
+        queries.push(`site:linkedin.com/in "${name}"`);
+        queries.push(`site:linkedin.com/in ${name}`);
+      }
     } else if (company) {
       queries.push(`site:linkedin.com/in "${company}"`);
     }
