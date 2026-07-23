@@ -166,18 +166,65 @@ export class EnterpriseIdentityResolutionEngine {
         }
       }
 
+      // Check for Name Mismatch (Highly different names should not be resolved as the same person)
+      const nameSim = stringSimilarity(context.name, candidate.fullName);
+      const nameParts1 = context.name.toLowerCase().split(/[\s,]+/);
+      const nameParts2 = candidate.fullName.toLowerCase().split(/[\s,]+/);
+      const hasSignificantOverlap = nameParts1.some(p1 => 
+        p1.length >= 4 && nameParts2.some(p2 => p2.includes(p1) || p1.includes(p2))
+      );
+
+      // Strict First Name Mismatch Check (to prevent matching different first names sharing the same last name)
+      const firstName1 = nameParts1.find(w => w.length >= 3);
+      const firstName2 = nameParts2.find(w => w.length >= 3);
+      let isFirstNameMismatch = false;
+      if (firstName1 && firstName2) {
+        const match1 = nameParts2.some(w => stringSimilarity(firstName1, w) > 0.7);
+        const match2 = nameParts1.some(w => stringSimilarity(firstName2, w) > 0.7);
+        if (!match1 && !match2) {
+          isFirstNameMismatch = true;
+        }
+      }
+
+      const isNameMismatch = (nameSim < 0.45 && !hasSignificantOverlap) || isFirstNameMismatch;
+
+      // Check for Company & Designation Mismatch (Same/similar name, but totally different company and role)
+      let isCompanyRoleMismatch = false;
+      if (context.company && candidate.company && context.designation && (candidate.designation || candidate.headline)) {
+        const compSim = stringSimilarity(context.company, candidate.company);
+        const desigSim = stringSimilarity(context.designation, candidate.designation || candidate.headline || '');
+        if (compSim < 0.3 && desigSim < 0.3) {
+          isCompanyRoleMismatch = true;
+        }
+      }
+
       // Scale Identity Score and Add to Candidate
-      const finalIdentityBoost = Math.min(identityScore, 50);
-      
-      candidate.sourceConfidence = Math.min(candidate.sourceConfidence + finalIdentityBoost, 99);
-      
-      if (reasons.length > 0) {
-        const existingReasons = (candidate as any).verificationReasons || [];
-        (candidate as any).verificationReasons = [...existingReasons, ...reasons];
-        
+      let finalIdentityBoost = Math.min(identityScore, 50);
+
+      if (isNameMismatch || isCompanyRoleMismatch) {
+        // Force extremely low score for mismatches and flag as unverified
+        candidate.sourceConfidence = 1;
+        candidate.verificationStatus = 'Unverified';
+        const mismatchReason = isNameMismatch 
+          ? `✘ Name Mismatch: ${candidate.fullName} vs ${context.name}`
+          : `✘ Profile Mismatch: Company (${candidate.company}) and role do not match card details.`;
+          
+        (candidate as any).verificationReasons = [...((candidate as any).verificationReasons || []), mismatchReason];
         if (candidate.publicProfiles.length > 0) {
-           candidate.publicProfiles[0].reasons = [...(candidate.publicProfiles[0].reasons || []), ...reasons];
-           candidate.publicProfiles[0].confidence = candidate.sourceConfidence;
+          candidate.publicProfiles[0].reasons = [...(candidate.publicProfiles[0].reasons || []), mismatchReason];
+          candidate.publicProfiles[0].confidence = 1;
+        }
+      } else {
+        candidate.sourceConfidence = Math.max(0, Math.min(candidate.sourceConfidence + finalIdentityBoost, 99));
+        
+        if (reasons.length > 0) {
+          const existingReasons = (candidate as any).verificationReasons || [];
+          (candidate as any).verificationReasons = [...existingReasons, ...reasons];
+          
+          if (candidate.publicProfiles.length > 0) {
+             candidate.publicProfiles[0].reasons = [...(candidate.publicProfiles[0].reasons || []), ...reasons];
+             candidate.publicProfiles[0].confidence = candidate.sourceConfidence;
+          }
         }
       }
     }

@@ -342,10 +342,11 @@ export class ProfileDiscoveryEngine {
       // Evaluate each LinkedIn URL individually using search result metadata
       const urlScore = this.evaluateLinkedInUrlCandidate(signals, url, meta.title, meta.description);
       logger.info(`[ProfileDiscoveryEngine] LinkedIn URL evaluated: ${url} → Score: ${urlScore}%`);
+      const parsedTitle = this.parseLinkedInTitle(meta.title, signals.name, signals.company || undefined, signals.designation || undefined);
       candidates.push({
-        fullName: signals.name,
-        company: signals.company || undefined,
-        designation: signals.designation || undefined,
+        fullName: parsedTitle.fullName,
+        company: parsedTitle.company,
+        designation: parsedTitle.designation,
         experience: [],
         education: [],
         skills: [],
@@ -520,6 +521,46 @@ export class ProfileDiscoveryEngine {
       allDiscoveredUrls,
       rejectionReasons,
       searchProcess
+    };
+  }
+
+  private parseLinkedInTitle(title: string, defaultName: string, defaultCompany?: string, defaultDesignation?: string): { fullName: string; designation?: string; company?: string } {
+    let clean = title.replace(/\s*(\||\-)?\s*LinkedIn/gi, '').replace(/\s*on\s*LinkedIn/gi, '').trim();
+    const parts = clean.split(/\s*[\-\–\—]\s*/);
+    
+    if (parts.length === 0 || !parts[0].trim()) {
+      return { fullName: defaultName, company: defaultCompany, designation: defaultDesignation };
+    }
+    
+    const fullName = parts[0].trim();
+    
+    if (parts.length > 2) {
+      return {
+        fullName,
+        designation: parts[1].trim(),
+        company: parts[2].trim()
+      };
+    } else if (parts.length > 1) {
+      const headline = parts[1].trim();
+      const atIndex = headline.toLowerCase().lastIndexOf(' at ');
+      if (atIndex !== -1) {
+        return {
+          fullName,
+          designation: headline.substring(0, atIndex).trim(),
+          company: headline.substring(atIndex + 4).trim()
+        };
+      }
+      return {
+        fullName,
+        designation: headline,
+        company: defaultCompany
+      };
+    }
+    
+    return {
+      fullName,
+      company: defaultCompany,
+      designation: defaultDesignation
     };
   }
 

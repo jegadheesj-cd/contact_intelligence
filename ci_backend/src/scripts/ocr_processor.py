@@ -11,8 +11,10 @@ if hasattr(sys.stderr, 'reconfigure'):
 # pyrefly: ignore [missing-import]
 import cv2
 import numpy as np
-# pyrefly: ignore [missing-import]
-from rapidocr import RapidOCR
+try:
+    from rapidocr import RapidOCR
+except ImportError:
+    from rapidocr_onnxruntime import RapidOCR
 
 
 def preprocess_image(image_path):
