@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUploadCard, useCardDetails, useDeleteCard } from '../../../hooks/useScanner';
-import { useUpdateContact } from '../../../hooks/useContacts';
+import { useUpdateContact, useCreateContact, useTriggerEnrichment } from '../../../hooks/useContacts';
 import { useToastStore } from '../../../store/useToastStore';
 import { Loader } from '../../../components/Loader';
 import { Button } from '../../../components/Button';
@@ -55,6 +55,8 @@ export const ScannerPage: React.FC = () => {
   const uploadMutation = useUploadCard();
   const deleteMutation = useDeleteCard();
   const updateContactMutation = useUpdateContact();
+  const createContactMutation = useCreateContact();
+  const triggerEnrichmentMutation = useTriggerEnrichment();
 
   // Poll only during pending / processing
   const isPolling = step === 'processing';
@@ -158,38 +160,57 @@ export const ScannerPage: React.FC = () => {
   // Save reviewed fields
   const handleSaveReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!card?.contactId) {
-      addToast('No linked contact found to update.', 'error');
-      return;
-    }
 
     try {
-      // Map form fields to API format (and map linkedinUrl to profile)
+      // Map form fields to API format
       const contactPayload = {
         name: formFields.name,
-        company: formFields.company || null,
-        designation: formFields.designation || null,
-        email: formFields.email || null,
-        phone: formFields.phone || null,
-        website: formFields.website || null,
-        address: formFields.address || null,
-        linkedInUrl: formFields.linkedInUrl || null,
-        department: formFields.department || null,
-        industry: formFields.industry || null,
+        company: formFields.company || undefined,
+        designation: formFields.designation || undefined,
+        email: formFields.email || undefined,
+        phone: formFields.phone || undefined,
+        website: formFields.website || undefined,
+        address: formFields.address || undefined,
+        linkedInUrl: formFields.linkedInUrl || undefined,
+        department: formFields.department || undefined,
+        industry: formFields.industry || undefined,
         skills: formFields.skills ? formFields.skills.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
-        experience: formFields.experience || null,
-        education: formFields.education || null,
+        experience: formFields.experience || undefined,
+        education: formFields.education || undefined,
       };
 
-      await updateContactMutation.mutateAsync({
-        id: card.contactId,
-        data: contactPayload as any,
-      });
+      let finalContactId = card?.contactId;
 
-      addToast('Contact verified and created successfully.', 'success');
-      navigate(`/contacts/${card.contactId}`);
+      if (finalContactId) {
+        // Update existing contact
+        await updateContactMutation.mutateAsync({
+          id: finalContactId,
+          data: contactPayload as any,
+        });
+        addToast('Contact updated successfully.', 'success');
+      } else {
+        // Create new contact
+        const newContact = await createContactMutation.mutateAsync({
+          ...contactPayload,
+          source: 'BUSINESS_CARD',
+        } as any);
+        finalContactId = newContact.id;
+        addToast('Contact created successfully.', 'success');
+      }
+
+      // Trigger profile enrichment workflow immediately
+      if (finalContactId) {
+        try {
+          await triggerEnrichmentMutation.mutateAsync(finalContactId);
+          addToast('Profile enrichment started.', 'info');
+        } catch (enrichErr: any) {
+          addToast('Failed to start profile enrichment.', 'error');
+        }
+      }
+
+      navigate(`/contacts/${finalContactId}`);
     } catch (err: any) {
-      addToast(err.message || 'Failed to update contact.', 'error');
+      addToast(err.message || 'Failed to save contact.', 'error');
     }
   };
 

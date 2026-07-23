@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useReadNfcTag } from '../../../hooks/useIngestion';
-import { useUpdateContact } from '../../../hooks/useContacts';
+import { useUpdateContact, useCreateContact, useTriggerEnrichment } from '../../../hooks/useContacts';
 import { useToastStore } from '../../../store/useToastStore';
 import { Loader } from '../../../components/Loader';
 import { Button } from '../../../components/Button';
@@ -38,6 +38,8 @@ export const NfcReaderPage: React.FC = () => {
   // NFC Mutations hooks
   const readNfcMutation = useReadNfcTag();
   const updateContactMutation = useUpdateContact();
+  const createContactMutation = useCreateContact();
+  const triggerEnrichmentMutation = useTriggerEnrichment();
 
   // Detect Web NFC support on mount
   useEffect(() => {
@@ -142,30 +144,46 @@ export const NfcReaderPage: React.FC = () => {
   // Confirm save manually corrected fields
   const handleSaveContact = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!linkedContactId) {
-      addToast('No linked contact found to update.', 'error');
-      return;
-    }
 
     try {
       const contactPayload = {
         name: formFields.name,
-        company: formFields.company || null,
-        designation: formFields.designation || null,
-        email: formFields.email || null,
-        phone: formFields.phone || null,
-        website: formFields.website || null,
-        address: formFields.address || null,
-        linkedInUrl: formFields.linkedInUrl || null,
+        company: formFields.company || undefined,
+        designation: formFields.designation || undefined,
+        email: formFields.email || undefined,
+        phone: formFields.phone || undefined,
+        website: formFields.website || undefined,
+        address: formFields.address || undefined,
+        linkedInUrl: formFields.linkedInUrl || undefined,
       };
 
-      await updateContactMutation.mutateAsync({
-        id: linkedContactId,
-        data: contactPayload as any,
-      });
+      let finalContactId = linkedContactId;
 
-      addToast('NFC Contact details confirmed and saved.', 'success');
-      navigate(`/contacts/${linkedContactId}`);
+      if (finalContactId) {
+        await updateContactMutation.mutateAsync({
+          id: finalContactId,
+          data: contactPayload as any,
+        });
+        addToast('Contact updated successfully.', 'success');
+      } else {
+        const newContact = await createContactMutation.mutateAsync({
+          ...contactPayload,
+          source: 'NFC',
+        } as any);
+        finalContactId = newContact.id;
+        addToast('Contact created successfully.', 'success');
+      }
+
+      if (finalContactId) {
+        try {
+          await triggerEnrichmentMutation.mutateAsync(finalContactId);
+          addToast('Profile enrichment started.', 'info');
+        } catch (enrichErr: any) {
+          addToast('Failed to start profile enrichment.', 'error');
+        }
+      }
+
+      navigate(`/contacts/${finalContactId}`);
     } catch (err: any) {
       addToast(err.message || 'Failed to save contact adjustments.', 'error');
     }

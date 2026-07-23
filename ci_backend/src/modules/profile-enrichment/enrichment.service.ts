@@ -4,13 +4,17 @@ import { AppError } from '../../utils/AppError';
 import logger from '../../config/logger';
 import { generateTextWithFallback } from '../../utils/aiClient';
 
+import { IdentityResolver } from './services/IdentityResolver';
+import { SearchIntelligenceEngine } from './services/SearchIntelligenceEngine';
 import { ProfileDiscoveryEngine, CandidateProfile } from './services/ProfileDiscoveryEngine';
-import { ProfileVerificationEngine } from './services/ProfileVerificationEngine';
+import { SearchRankingEngine } from './services/SearchRankingEngine';
 import { ProfileMergeService, ProviderResponse } from './services/ProfileMergeService';
 import { EnterpriseIdentityResolutionEngine } from './services/EnterpriseIdentityResolutionEngine';
 
+const identityResolver = new IdentityResolver();
+const searchIntelligenceEngine = new SearchIntelligenceEngine();
 const discoveryEngine = new ProfileDiscoveryEngine();
-const verificationEngine = new ProfileVerificationEngine();
+const rankingEngine = new SearchRankingEngine();
 const mergeService = new ProfileMergeService();
 const identityResolutionEngine = new EnterpriseIdentityResolutionEngine();
 
@@ -77,6 +81,12 @@ export class ProfileEnrichmentService {
     logger.info(`[DiscoveryPipeline] Email: ${context.email || 'N/A'}`);
     logger.info(`[DiscoveryPipeline] Website: ${context.website || 'N/A'}`);
 
+    // Step 0.5: Identity Extraction for Search Intelligence & Ranking
+    const signals = identityResolver.resolve(context);
+
+    // Step 0.75: Optional Knowledge Graph Enrichment (Search Intelligence Engine)
+    const kgEntity = await searchIntelligenceEngine.queryKnowledgeGraph(signals);
+
     // Step 1: Full discovery (LinkedIn + GitHub + Company Website in parallel)
     const discoveryResult = await discoveryEngine.fullDiscovery(context);
 
@@ -114,27 +124,8 @@ export class ProfileEnrichmentService {
       };
     }
 
-    // Step 2: Rank every candidate using weighted scoring
-    const rankedCandidates = candidates.map(candidate => {
-      const verifResult = verificationEngine.verify(context, candidate);
-      // Preserve per-link confidence scores from discovery (e.g. evaluateLinkedInUrlCandidate).
-      // Only fall back to the candidate-level verification score if a link has no pre-set confidence.
-      const updatedPublicProfiles = (candidate.publicProfiles || []).map(p => ({
-        ...p,
-        confidence: p.confidence !== undefined ? p.confidence : verifResult.confidence,
-        reasons: (p.reasons && p.reasons.length > 0) ? p.reasons : verifResult.reasons
-      }));
-      return {
-        ...candidate,
-        publicProfiles: updatedPublicProfiles,
-        sourceConfidence: verifResult.confidence,
-        verificationStatus: verifResult.isVerified ? 'Verified' : 'No verified professional profile found',
-        verificationReasons: verifResult.reasons
-      };
-    });
-
-    // Sort all candidates by initial confidence descending
-    rankedCandidates.sort((a, b) => b.sourceConfidence - a.sourceConfidence);
+    // Step 2: Rank every candidate using Search Ranking Engine (Highest/High/Medium/Low Weights)
+    const rankedCandidates = rankingEngine.rankCandidates(signals, candidates);
 
     // Step 2.5: Identity Resolution Engine (Re-ranks candidates based on 15 signals + AI)
     const identityResolvedCandidates = await identityResolutionEngine.resolveIdentities(context, rankedCandidates);
@@ -257,7 +248,8 @@ Bios/Headlines: ${JSON.stringify(pubBios)}
 Experience: ${JSON.stringify(exp)}
 Education: ${JSON.stringify(edu)}
 Skills/Tech: ${JSON.stringify(skills)}
-Projects/Repos: ${JSON.stringify(repos)}`;
+Projects/Repos: ${JSON.stringify(repos)}
+${kgEntity ? `Google Knowledge Graph Info: ${JSON.stringify(kgEntity)}` : ''}`;
 
         const aiSummary = await generateTextWithFallback(summaryPrompt, 'gemini-1.5-pro', 'Professional Summary');
         mergedProfile.summary = {

@@ -21,6 +21,7 @@ const envSchema = z.object({
   BRAVE_SEARCH_API_KEY: z.string().optional(),
   GOOGLE_SEARCH_CX: z.string().optional(),
   GOOGLE_SEARCH_API_KEY: z.string().optional(),
+  GOOGLE_KNOWLEDGE_GRAPH_API_KEY: z.string().optional(),
   BING_SEARCH_API_KEY: z.string().optional(),
   TAVILY_API_KEY: z.string().optional(),
   SEARCH_PROVIDER: z.enum(['brave', 'google_custom', 'bing', 'tavily', 'fallback']).default('fallback'),
