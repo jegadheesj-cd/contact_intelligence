@@ -153,6 +153,19 @@ export class SearchRankingEngine {
         }
       }
 
+      // --- CRITICAL PENALTY ---
+      // If the name is completely different, cap the confidence to prevent false positives
+      // (e.g. colleagues at the same company sharing the same domain/website)
+      const nameParts1 = signals.name.toLowerCase().split(/[\s,]+/);
+      const nameParts2 = candidate.fullName.toLowerCase().split(/[\s,]+/);
+      const hasSignificantOverlap = nameParts1.some(p1 => 
+        p1.length >= 4 && nameParts2.some(p2 => p2.includes(p1) || p1.includes(p2))
+      );
+      if (nameSim < 0.45 && !hasSignificantOverlap) {
+        confidence = Math.min(confidence, 30);
+        reasons.push('Penalty: Severe Name Mismatch');
+      }
+
       // Never assign identical confidence values.
       // We add a tiny tie-breaker based on the index to ensure uniqueness if ties occur.
       const tieBreaker = (candidates.length - i) * 0.0001; 
