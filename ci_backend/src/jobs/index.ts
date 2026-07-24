@@ -345,7 +345,23 @@ export const enrichmentWorker = new Worker(
       const failedDuration = Date.now() - pipelineStartTime;
       logger.error(`[Enrichment Pipeline] FAILED - Pipeline crashed after ${failedDuration}ms. Reason: ${error.message}`);
       logger.error(error.stack || error);
-      await updateStatus(JobStatus.FAILED).catch((dbErr) => logger.error(`[Enrichment Pipeline] Failed to update status: ${dbErr.message}`));
+      
+      const updateData: any = { enrichmentStatus: JobStatus.FAILED };
+      if (error.name === 'ProviderError') {
+        updateData.verificationStatus = error.message;
+        updateData.providerResponses = [{
+          success: false,
+          provider: error.provider || 'Tavily',
+          status: error.status || 'PROVIDER_UNAVAILABLE',
+          message: error.message
+        }];
+      }
+      
+      await prisma.professionalProfile.update({
+        where: { id: profileId },
+        data: updateData,
+      }).catch((dbErr) => logger.error(`[Enrichment Pipeline] Failed to update status: ${dbErr.message}`));
+      
       throw error;
     }
 

@@ -1,7 +1,8 @@
 import logger from '../../../config/logger';
 import { IdentityResolver, IdentitySignals } from './IdentityResolver';
 import { SearchQueryBuilder } from './SearchQueryBuilder';
-import { SearchEngineAdapter, SearchResult } from './SearchEngineAdapter';
+import { ProviderManager } from './providers/ProviderManager';
+import { ProviderError } from './providers/ISearchProvider';
 import { CheerioParser } from './CheerioParser';
 import { stringSimilarity } from '../../../utils/stringUtils';
 
@@ -57,7 +58,7 @@ export interface DiscoveryResult {
 export class ProfileDiscoveryEngine {
   private identityResolver = new IdentityResolver();
   private queryBuilder = new SearchQueryBuilder();
-  private searchAdapter = new SearchEngineAdapter();
+  private providerManager = new ProviderManager();
   private cheerioParser = new CheerioParser();
 
   /**
@@ -95,14 +96,13 @@ export class ProfileDiscoveryEngine {
     const discoveredFacebookUrls = new Map<string, { title: string; description: string }>();
     const discoveredTwitterUrls = new Map<string, { title: string; description: string }>();
 
-    const trackSearchProviderResults = (results: any[]) => {
-      const provider = this.searchAdapter.lastProviderUsed;
-      const current = searchProcess[provider] || "0 Results";
+    const trackSearchProviderResults = (results: any[], providerName: string) => {
+      const current = searchProcess[providerName] || "0 Results";
       let count = 0;
       if (current.includes("Results")) {
         count = parseInt(current.split(" ")[0]) || 0;
       }
-      searchProcess[provider] = `${count + results.length} Results`;
+      searchProcess[providerName] = `${count + results.length} Results`;
     };
 
     // 1. Check for direct LinkedIn URL on the card
@@ -125,16 +125,17 @@ export class ProfileDiscoveryEngine {
       searchQueries.push(query);
       try {
         logger.info(`[ProfileDiscoveryEngine] Executing search query: "${query}"`);
-        const results = await this.searchAdapter.search(query);
-        trackSearchProviderResults(results);
+        const response = await this.providerManager.search(query);
+        trackSearchProviderResults(response.results, response.provider);
 
-        for (const res of results) {
+        for (const res of response.results) {
           if (res.url.includes('linkedin.com/in/')) {
             discoveredLinkedInUrls.set(res.url, { title: res.title || '', description: res.snippet || '' });
             allDiscoveredUrls.push({ url: res.url, source: 'linkedin-discovery-search' });
           }
         }
       } catch (e: any) {
+        if (e.name === 'ProviderError') throw e;
         logger.warn(`[ProfileDiscoveryEngine] LinkedIn Search failed for query "${query}": ${e.message}`);
         rejectionReasons.push(`LinkedIn search failed: ${e.message}`);
       }
@@ -148,16 +149,17 @@ export class ProfileDiscoveryEngine {
       searchQueries.push(query);
       try {
         logger.info(`[ProfileDiscoveryEngine] Searching for Company Website using query: "${query}"`);
-        const results = await this.searchAdapter.search(query);
-        trackSearchProviderResults(results);
+        const response = await this.providerManager.search(query);
+        trackSearchProviderResults(response.results, response.provider);
 
-        for (const res of results) {
+        for (const res of response.results) {
           if (res.url && !res.url.includes('linkedin.com') && !res.url.includes('github.com') && !res.url.includes('wikipedia.org')) {
             discoveredCompanyUrls.add(res.url);
             allDiscoveredUrls.push({ url: res.url, source: 'company-website-search' });
           }
         }
       } catch (e: any) {
+        if (e.name === 'ProviderError') throw e;
         logger.warn(`[ProfileDiscoveryEngine] Company Web Search query failed: ${e.message}`);
       }
     }
@@ -167,16 +169,17 @@ export class ProfileDiscoveryEngine {
       searchQueries.push(query);
       try {
         logger.info(`[ProfileDiscoveryEngine] Searching for GitHub URL using query: "${query}"`);
-        const results = await this.searchAdapter.search(query);
-        trackSearchProviderResults(results);
+        const response = await this.providerManager.search(query);
+        trackSearchProviderResults(response.results, response.provider);
 
-        for (const res of results) {
+        for (const res of response.results) {
           if (res.url.includes('github.com/') && !res.url.includes('/search') && !res.url.includes('/topics')) {
             discoveredGitHubUrls.add(res.url);
             allDiscoveredUrls.push({ url: res.url, source: 'github-url-search' });
           }
         }
       } catch (e: any) {
+        if (e.name === 'ProviderError') throw e;
         logger.warn(`[ProfileDiscoveryEngine] GitHub URL search query failed: ${e.message}`);
       }
     }
@@ -187,15 +190,16 @@ export class ProfileDiscoveryEngine {
       searchQueries.push(portQuery);
       try {
         logger.info(`[ProfileDiscoveryEngine] Searching for Portfolios using query: "${portQuery}"`);
-        const results = await this.searchAdapter.search(portQuery);
-        trackSearchProviderResults(results);
+        const response = await this.providerManager.search(portQuery);
+        trackSearchProviderResults(response.results, response.provider);
 
-        for (const res of results) {
+        for (const res of response.results) {
           if (res.url && !res.url.includes('linkedin.com') && !res.url.includes('github.com') && !res.url.includes('wikipedia.org')) {
             discoveredPortfolioUrls.add(res.url);
           }
         }
       } catch (e: any) {
+        if (e.name === 'ProviderError') throw e;
         logger.warn(`[ProfileDiscoveryEngine] Portfolio discovery query failed: ${e.message}`);
       }
     }
@@ -205,16 +209,17 @@ export class ProfileDiscoveryEngine {
       searchQueries.push(query);
       try {
         logger.info(`[ProfileDiscoveryEngine] Searching for Instagram profiles using query: "${query}"`);
-        const results = await this.searchAdapter.search(query);
-        trackSearchProviderResults(results);
+        const response = await this.providerManager.search(query);
+        trackSearchProviderResults(response.results, response.provider);
 
-        for (const res of results) {
+        for (const res of response.results) {
           if (res.url.includes('instagram.com/') && !res.url.includes('/explore') && !res.url.includes('/tags') && !res.url.includes('/locations')) {
             discoveredInstagramUrls.set(res.url, { title: res.title || '', description: res.snippet || '' });
             allDiscoveredUrls.push({ url: res.url, source: 'instagram-discovery-search' });
           }
         }
       } catch (e: any) {
+        if (e.name === 'ProviderError') throw e;
         logger.warn(`[ProfileDiscoveryEngine] Instagram Search failed for query "${query}": ${e.message}`);
         rejectionReasons.push(`Instagram search failed: ${e.message}`);
       }
@@ -225,16 +230,17 @@ export class ProfileDiscoveryEngine {
       searchQueries.push(query);
       try {
         logger.info(`[ProfileDiscoveryEngine] Searching for Facebook profiles using query: "${query}"`);
-        const results = await this.searchAdapter.search(query);
-        trackSearchProviderResults(results);
+        const response = await this.providerManager.search(query);
+        trackSearchProviderResults(response.results, response.provider);
 
-        for (const res of results) {
+        for (const res of response.results) {
           if (res.url.includes('facebook.com/') && !res.url.includes('/groups') && !res.url.includes('/events') && !res.url.includes('/marketplace')) {
             discoveredFacebookUrls.set(res.url, { title: res.title || '', description: res.snippet || '' });
             allDiscoveredUrls.push({ url: res.url, source: 'facebook-discovery-search' });
           }
         }
       } catch (e: any) {
+        if (e.name === 'ProviderError') throw e;
         logger.warn(`[ProfileDiscoveryEngine] Facebook Search failed for query "${query}": ${e.message}`);
         rejectionReasons.push(`Facebook search failed: ${e.message}`);
       }
@@ -245,16 +251,17 @@ export class ProfileDiscoveryEngine {
       searchQueries.push(query);
       try {
         logger.info(`[ProfileDiscoveryEngine] Searching for Twitter/X profiles using query: "${query}"`);
-        const results = await this.searchAdapter.search(query);
-        trackSearchProviderResults(results);
+        const response = await this.providerManager.search(query);
+        trackSearchProviderResults(response.results, response.provider);
 
-        for (const res of results) {
+        for (const res of response.results) {
           if ((res.url.includes('twitter.com/') || res.url.includes('x.com/')) && !res.url.includes('/search') && !res.url.includes('/hashtag') && !res.url.includes('/i/')) {
             discoveredTwitterUrls.set(res.url, { title: res.title || '', description: res.snippet || '' });
             allDiscoveredUrls.push({ url: res.url, source: 'twitter-discovery-search' });
           }
         }
       } catch (e: any) {
+        if (e.name === 'ProviderError') throw e;
         logger.warn(`[ProfileDiscoveryEngine] Twitter/X Search failed for query "${query}": ${e.message}`);
         rejectionReasons.push(`Twitter/X search failed: ${e.message}`);
       }
@@ -393,22 +400,21 @@ export class ProfileDiscoveryEngine {
     }
 
     // Step 8: Add Company website candidate details
-    for (let idx = 0; idx < companyWebDataArray.length; idx++) {
-      const companyWebData = companyWebDataArray[idx];
-      if (!companyWebData) continue;
+    for (let idx = 0; idx < companyUrlsList.length; idx++) {
       const url = companyUrlsList[idx];
+      const companyWebData = companyWebDataArray[idx];
       candidates.push({
         fullName: signals.name,
-        company: signals.company || companyWebData.companyName || undefined,
+        company: signals.company || companyWebData?.companyName || undefined,
         designation: signals.designation || undefined,
-        companyBio: companyWebData.about,
-        companyRole: companyWebData.leadership?.find((l: any) => stringSimilarity(l.name, signals.name) > 0.6)?.designation,
-        companyDepartment: companyWebData.leadership?.find((l: any) => stringSimilarity(l.name, signals.name) > 0.6)?.department,
+        companyBio: companyWebData?.about,
+        companyRole: companyWebData?.leadership?.find((l: any) => stringSimilarity(l.name, signals.name) > 0.6)?.designation,
+        companyDepartment: companyWebData?.leadership?.find((l: any) => stringSimilarity(l.name, signals.name) > 0.6)?.department,
         experience: [],
         education: [],
         skills: [],
         projects: [],
-        publicProfiles: [{ platform: 'Company Website', url }],
+        publicProfiles: [{ platform: 'Company Website', url, confidence: 90 }],
         source: 'Company Website',
         sourceConfidence: 90,
         verificationStatus: 'Verified'

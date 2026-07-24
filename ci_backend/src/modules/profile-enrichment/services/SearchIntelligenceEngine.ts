@@ -1,6 +1,7 @@
 import logger from '../../../config/logger';
 import { env } from '../../../config/env';
-import { SearchEngineAdapter, SearchResult } from './SearchEngineAdapter';
+import { ProviderManager } from './providers/ProviderManager';
+import { SearchResult } from './providers/ISearchProvider';
 import { IdentitySignals } from './IdentityResolver';
 
 export interface KnowledgeGraphEntity {
@@ -13,7 +14,7 @@ export interface KnowledgeGraphEntity {
 }
 
 export class SearchIntelligenceEngine {
-  private searchAdapter = new SearchEngineAdapter();
+  private providerManager = new ProviderManager();
 
   /**
    * Executes a search query using the configured search provider.
@@ -21,7 +22,8 @@ export class SearchIntelligenceEngine {
    */
   public async executeSearch(query: string): Promise<SearchResult[]> {
     logger.info(`[SearchIntelligenceEngine] Executing intelligent search for query: "${query}"`);
-    return await this.searchAdapter.search(query);
+    const response = await this.providerManager.search(query);
+    return response.results;
   }
 
   /**

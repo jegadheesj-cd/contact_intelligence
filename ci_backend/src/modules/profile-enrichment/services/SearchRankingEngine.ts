@@ -159,6 +159,12 @@ export class SearchRankingEngine {
       
       // Cap at 99.9% max and at least 1% for any discovered profile
       confidence = Math.max(1, Math.min(confidence, 99.9));
+      
+      // PRESERVE the original source confidence (e.g. from search snippets) if it's higher 
+      // than the score calculated from scraped profile details (which often fail for social media).
+      const originalConfidence = candidate.sourceConfidence || 0;
+      confidence = Math.max(confidence, originalConfidence);
+
       confidence = confidence + tieBreaker;
 
       // Update candidate confidence

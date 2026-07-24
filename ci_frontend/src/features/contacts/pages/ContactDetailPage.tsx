@@ -258,7 +258,8 @@ export const ContactDetailPage: React.FC = () => {
   };
 
   // Group discovered candidates by platform
-  const getPlatformName = (source: string) => {
+  const getPlatformName = (source?: string) => {
+    if (!source) return 'Other Platforms';
     const s = source.toLowerCase();
     if (s.includes('linkedin')) return 'LinkedIn';
     if (s.includes('github')) return 'GitHub';
@@ -276,8 +277,11 @@ export const ContactDetailPage: React.FC = () => {
     
     const groups: Record<string, any[]> = {};
     responses.forEach((resp) => {
-      // Only display discovered candidates that have at least 60% confidence
-      if (resp.confidence < 60) return;
+      // Ignore objects that are not actual profile candidates (e.g. error responses)
+      if (resp.success === false || !resp.sourceName) return;
+
+      // Only display discovered candidates that have at least 40% confidence
+      if (resp.confidence < 40) return;
 
       const platform = getPlatformName(resp.sourceName);
       if (!groups[platform]) groups[platform] = [];
@@ -286,7 +290,7 @@ export const ContactDetailPage: React.FC = () => {
     return groups;
   };
 
-  const groupedCandidates = groupCandidatesByPlatform();
+  const groupedCandidates = enrichmentStatus === 'FAILED' ? {} : groupCandidatesByPlatform();
 
   // Helper to render field inline edit row
   const renderInlineEditRow = (fieldName: string, label: string, icon: React.ReactNode, value: string | null | undefined) => {
@@ -891,7 +895,25 @@ export const ContactDetailPage: React.FC = () => {
         {/* PROFILE DISCOVERY TAB */}
         {activeTab === 'discovery' && (
           <div className="space-y-6 animate-slide-down">
-            {Object.keys(groupedCandidates).length === 0 ? (
+            {enrichmentStatus === 'FAILED' ? (
+              <div className="bg-rose-50 p-12 border border-rose-100 rounded-xl text-center flex flex-col items-center">
+                <div className="p-3 bg-white text-rose-500 rounded-full mb-3 shadow-sm border border-rose-100">
+                  <AlertTriangle className="h-6 w-6" />
+                </div>
+                <h3 className="text-sm font-bold text-rose-800">Enrichment Pipeline Failed</h3>
+                
+                {contact.professionalProfile?.providerResponses && Array.isArray(contact.professionalProfile.providerResponses) && contact.professionalProfile.providerResponses.length > 0 ? (
+                  <div className="mt-4 p-4 bg-white border border-rose-200 rounded-lg text-left inline-block">
+                    <p className="text-xs font-bold text-rose-900 mb-1">Provider: <span className="font-semibold text-rose-700">{contact.professionalProfile.providerResponses[0].provider}</span></p>
+                    <p className="text-xs font-bold text-rose-900">Reason: <br/><span className="font-semibold text-rose-700 mt-0.5 block">{contact.professionalProfile.providerResponses[0].message}</span></p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-rose-600 mt-1.5 max-w-sm leading-relaxed font-semibold">
+                    {verificationStatus || 'An unknown error occurred during profile discovery.'}
+                  </p>
+                )}
+              </div>
+            ) : Object.keys(groupedCandidates).length === 0 ? (
               <div className="bg-white p-12 border border-slate-100 rounded-xl text-center flex flex-col items-center">
                 <div className="p-3 bg-slate-50 text-slate-400 rounded-full mb-3">
                   <Search className="h-6 w-6" />

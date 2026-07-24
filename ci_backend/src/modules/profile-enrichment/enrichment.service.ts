@@ -144,7 +144,9 @@ export class ProfileEnrichmentService {
 
     // Prepare provider responses for ALL candidates (sorted by final confidence descending)
     const providersUsed = Array.from(new Set(identityResolvedCandidates.map(c => c.source)));
-    const providerResponses: ProviderResponse[] = identityResolvedCandidates.map(c => ({
+    const providerResponses: ProviderResponse[] = identityResolvedCandidates
+      .filter(c => c.sourceConfidence >= 40)
+      .map(c => ({
       sourceName: c.source,
       confidence: c.sourceConfidence,
       data: c
