@@ -142,12 +142,9 @@ export class ProfileEnrichmentService {
     logger.info(`[DiscoveryPipeline] Accepted Candidates: ${acceptedCandidates.length}`);
     logger.info(`[DiscoveryPipeline] Rejected Candidates: ${rejectedCandidates.length}`);
 
-    // Prepare provider responses for VIABLE candidates (sorted by final confidence descending)
-    // We filter out completely mismatched candidates (confidence < 40) so they don't pollute the frontend UI.
-    const viableCandidates = identityResolvedCandidates.filter(c => c.sourceConfidence >= 40);
-
-    const providersUsed = Array.from(new Set(viableCandidates.map(c => c.source)));
-    const providerResponses: ProviderResponse[] = viableCandidates.map(c => ({
+    // Prepare provider responses for ALL candidates (sorted by final confidence descending)
+    const providersUsed = Array.from(new Set(identityResolvedCandidates.map(c => c.source)));
+    const providerResponses: ProviderResponse[] = identityResolvedCandidates.map(c => ({
       sourceName: c.source,
       confidence: c.sourceConfidence,
       data: c

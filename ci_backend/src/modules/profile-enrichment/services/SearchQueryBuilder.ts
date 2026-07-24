@@ -38,9 +38,10 @@ export class SearchQueryBuilder {
       if (website) queries.push(`site:linkedin.com/in "${name}" "${website}"`);
       if (address) queries.push(`site:linkedin.com/in "${name}" "${address}"`);
       
-      // Always include name-only queries as a fallback, just in case the company/designation isn't indexed yet
-      queries.push(`site:linkedin.com/in "${name}"`);
-      queries.push(`site:linkedin.com/in ${name}`);
+      if (!company) {
+        queries.push(`site:linkedin.com/in "${name}"`);
+        queries.push(`site:linkedin.com/in ${name}`);
+      }
     } else if (company) {
       queries.push(`site:linkedin.com/in "${company}"`);
     }

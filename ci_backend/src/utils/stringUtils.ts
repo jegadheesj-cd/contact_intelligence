@@ -8,9 +8,7 @@ export function stringSimilarity(s1: string, s2: string): number {
   const b = s2.toLowerCase().trim();
   
   if (a === b) return 1.0;
-  
-  // High score for substring match ONLY if the smaller string is at least 4 characters long
-  if (a.length >= 4 && b.length >= 4 && (a.includes(b) || b.includes(a))) return 0.8;
+  if (a.includes(b) || b.includes(a)) return 0.8; // High score for substring match
 
   const matrix = Array(a.length + 1).fill(null).map(() => Array(b.length + 1).fill(null));
 
