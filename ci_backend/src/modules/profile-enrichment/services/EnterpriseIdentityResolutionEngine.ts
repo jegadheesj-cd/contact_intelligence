@@ -171,7 +171,7 @@ export class EnterpriseIdentityResolutionEngine {
       const nameParts1 = context.name.toLowerCase().split(/[\s,]+/);
       const nameParts2 = candidate.fullName.toLowerCase().split(/[\s,]+/);
       const hasSignificantOverlap = nameParts1.some(p1 => 
-        p1.length >= 4 && nameParts2.some(p2 => p2.includes(p1) || p1.includes(p2))
+        p1.length >= 4 && nameParts2.some(p2 => p2.length >= 4 && (p2.includes(p1) || p1.includes(p2)))
       );
 
       // Strict First Name Mismatch Check (to prevent matching different first names sharing the same last name)
@@ -202,17 +202,31 @@ export class EnterpriseIdentityResolutionEngine {
       let finalIdentityBoost = Math.min(identityScore, 50);
 
       if (isNameMismatch || isCompanyRoleMismatch) {
-        // Force extremely low score for mismatches and flag as unverified
-        candidate.sourceConfidence = 1;
+        let penalty = 0;
+        let penaltyReason = '';
+        if (isNameMismatch) {
+            if (nameSim < 0.2 && !hasSignificantOverlap) {
+                penalty = 50;
+                penaltyReason = `Penalty: Strong Name Mismatch: -${penalty}`;
+            } else if (nameSim < 0.45 && !hasSignificantOverlap) {
+                penalty = 25;
+                penaltyReason = `Penalty: Moderate Name Mismatch: -${penalty}`;
+            } else {
+                penalty = 15;
+                penaltyReason = `Penalty: Minor Name Mismatch: -${penalty}`;
+            }
+        } else if (isCompanyRoleMismatch) {
+            penalty = 20;
+            penaltyReason = `Penalty: Profile Mismatch (Company/Role): -${penalty}`;
+        }
+
+        candidate.sourceConfidence = Math.max(1, candidate.sourceConfidence - penalty);
         candidate.verificationStatus = 'Unverified';
-        const mismatchReason = isNameMismatch 
-          ? `✘ Name Mismatch: ${candidate.fullName} vs ${context.name}`
-          : `✘ Profile Mismatch: Company (${candidate.company}) and role do not match card details.`;
-          
-        (candidate as any).verificationReasons = [...((candidate as any).verificationReasons || []), mismatchReason];
+        
+        (candidate as any).verificationReasons = [...((candidate as any).verificationReasons || []), penaltyReason];
         if (candidate.publicProfiles.length > 0) {
-          candidate.publicProfiles[0].reasons = [...(candidate.publicProfiles[0].reasons || []), mismatchReason];
-          candidate.publicProfiles[0].confidence = 1;
+          candidate.publicProfiles[0].reasons = [...(candidate.publicProfiles[0].reasons || []), penaltyReason];
+          candidate.publicProfiles[0].confidence = candidate.sourceConfidence;
         }
       } else {
         candidate.sourceConfidence = Math.max(0, Math.min(candidate.sourceConfidence + finalIdentityBoost, 99));

@@ -8,7 +8,12 @@ export function stringSimilarity(s1: string, s2: string): number {
   const b = s2.toLowerCase().trim();
   
   if (a === b) return 1.0;
-  if (a.includes(b) || b.includes(a)) return 0.8; // High score for substring match
+  
+  // Only apply substring boost if the shorter string is at least 4 characters long.
+  // This prevents single-letter initials (like 's') from matching randomly inside longer words ('jegadhees')
+  if (a.length >= 4 && b.length >= 4) {
+    if (a.includes(b) || b.includes(a)) return 0.8; // High score for substring match
+  }
 
   const matrix = Array(a.length + 1).fill(null).map(() => Array(b.length + 1).fill(null));
 

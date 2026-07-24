@@ -10,7 +10,9 @@ interface JWTPayload {
   role: Role;
 }
 
-export const authenticateJWT = (req: Request, res: Response, next: NextFunction): void => {
+import prisma from '../config/db';
+
+export const authenticateJWT = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -21,6 +23,13 @@ export const authenticateJWT = (req: Request, res: Response, next: NextFunction)
 
   try {
     const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as JWTPayload;
+    
+    // Verify user still exists in database
+    const userExists = await prisma.user.findUnique({ where: { id: decoded.id } });
+    if (!userExists) {
+      return next(new AppError('User no longer exists', 401));
+    }
+
     req.user = {
       id: decoded.id,
       email: decoded.email,

@@ -49,41 +49,56 @@ export class SearchRankingEngine {
       const candidateStr = JSON.stringify(candidate).toLowerCase();
 
       // --- Highest Weight (Up to 45%) ---
-      // 1. Exact Name Match (20%)
+      // 1. Exact Name Match
       const nameSim = stringSimilarity(signals.name.toLowerCase(), candidate.fullName.toLowerCase());
-      if (nameSim > 0.85) {
-        confidence += 20;
-        reasons.push('Highest Weight: Exact Name Match');
-      } else if (nameSim > 0.6) {
-        confidence += 10;
-        reasons.push('Partial Name Match');
+      const nameParts1 = signals.name.toLowerCase().split(/[\s,]+/);
+      const nameParts2 = candidate.fullName.toLowerCase().split(/[\s,]+/);
+      const firstName1 = nameParts1.find(w => w.length >= 3);
+      const firstName2 = nameParts2.find(w => w.length >= 3);
+      
+      let firstNamesMatch = false;
+      if (firstName1 && firstName2) {
+          firstNamesMatch = stringSimilarity(firstName1, firstName2) > 0.8;
       }
 
-      // 2. Email Match (10%)
+      if (nameSim > 0.85) {
+        confidence += 35;
+        reasons.push('Name Similarity: +35');
+      } else if (nameSim > 0.6) {
+        confidence += 25;
+        reasons.push('Name Similarity: +25');
+      } else if (firstNamesMatch || nameSim > 0.4) {
+        confidence += 15;
+        reasons.push('Name Similarity: +15');
+      } else {
+        reasons.push('Name Similarity: +0');
+      }
+
+      // 2. Email Match
       let hasEmailMatch = false;
       if (signals.email && candidateStr.includes(signals.email.toLowerCase())) {
-        confidence += 10;
+        confidence += 20;
         hasEmailMatch = true;
-        reasons.push('Highest Weight: Email Match');
+        reasons.push('Email Match: +20');
       }
 
-      // 3. Phone Match (10%)
+      // 3. Phone Match
       if (signals.phone && candidateStr.includes(signals.phone.replace(/[^0-9]/g, ''))) {
         confidence += 10;
-        reasons.push('Highest Weight: Phone Match');
+        reasons.push('Phone Match: +10');
       }
 
-      // 4. Email Domain Match (5%)
+      // 4. Email Domain Match
       if (ocrDomain && !hasEmailMatch) {
         if ((candidate.company && candidate.company.toLowerCase().includes(ocrDomain.split('.')[0])) ||
             candidate.publicProfiles.some(p => p.url.toLowerCase().includes(ocrDomain))) {
           confidence += 5;
-          reasons.push('Highest Weight: Email Domain Match');
+          reasons.push('Domain Match: +5');
         }
       }
 
-      // --- High Weight (Up to 25%) ---
-      // 5. Company Match (15%)
+      // --- High Weight ---
+      // 5. Company Match
       if (signals.company) {
         let bestCompSim = 0;
         if (candidate.company) bestCompSim = stringSimilarity(signals.company.toLowerCase(), candidate.company.toLowerCase());
@@ -92,23 +107,24 @@ export class SearchRankingEngine {
           if (exp.company) bestCompSim = Math.max(bestCompSim, stringSimilarity(signalCompany.toLowerCase(), exp.company.toLowerCase()));
         });
         if (bestCompSim > 0.8) {
-          confidence += 15;
-          reasons.push('High Weight: Company Match');
+          confidence += 20;
+          reasons.push('Company Match: +20');
         } else if (bestCompSim > 0.5) {
-          confidence += 7;
+          confidence += 10;
+          reasons.push('Company Match: +10');
         }
       }
 
-      // 6. Company Website Match (10%)
+      // 6. Company Website Match
       if (ocrWebDomain) {
         if (candidate.publicProfiles.some(p => getWebsiteDomain(p.url) === ocrWebDomain) || candidate.companyBio) {
-          confidence += 10;
-          reasons.push('High Weight: Company Website Match');
+          confidence += 5;
+          reasons.push('Website Match: +5');
         }
       }
 
-      // --- Medium Weight (Up to 20%) ---
-      // 7. Username Similarity (5%)
+      // --- Medium Weight ---
+      // 7. Username Similarity
       if (signals.email) {
         const emailPrefix = signals.email.split('@')[0].toLowerCase();
         const usernames = candidate.publicProfiles.map(p => {
@@ -116,40 +132,40 @@ export class SearchRankingEngine {
           return match ? match[1].split('?')[0].toLowerCase() : '';
         }).filter(Boolean);
         if (usernames.some(u => u.includes(emailPrefix) || emailPrefix.includes(u))) {
-          confidence += 5;
-          reasons.push('Medium Weight: Username Similarity');
+          confidence += 10;
+          reasons.push('Username Match: +10');
         }
       }
 
-      // 8. Website Match (Generic / Portfolio) (5%)
+      // 8. Website Match (Generic / Portfolio)
       if (candidate.source === 'Portfolio Scraper') {
         confidence += 5;
-        reasons.push('Medium Weight: Website Match (Portfolio)');
+        reasons.push('Portfolio Match: +5');
       }
 
-      // 9. Location Match (5%)
+      // 9. Location Match
       if (signals.address && candidate.location) {
         if (stringSimilarity(signals.address.toLowerCase(), candidate.location.toLowerCase()) > 0.5) {
           confidence += 5;
-          reasons.push('Medium Weight: Location Match');
+          reasons.push('Location Match: +5');
         }
       }
 
-      // 10. Cross Platform References (5%)
+      // 10. Cross Platform References
       if (candidate.publicProfiles.length > 1) {
         confidence += 5;
-        reasons.push('Medium Weight: Cross Platform References');
+        reasons.push('Cross-platform references: +5');
       }
 
-      // --- Low Weight (Up to 5%) ---
-      // 11. Designation Similarity (5%)
+      // --- Low Weight ---
+      // 11. Designation Similarity
       if (signals.designation) {
         let bestDesigSim = 0;
         if (candidate.designation) bestDesigSim = Math.max(bestDesigSim, stringSimilarity(signals.designation.toLowerCase(), candidate.designation.toLowerCase()));
         if (candidate.headline) bestDesigSim = Math.max(bestDesigSim, stringSimilarity(signals.designation.toLowerCase(), candidate.headline.toLowerCase()));
         if (bestDesigSim > 0.6) {
-          confidence += 5;
-          reasons.push('Low Weight: Designation Similarity');
+          confidence += 10;
+          reasons.push('Designation Match: +10');
         }
       }
 
@@ -157,13 +173,16 @@ export class SearchRankingEngine {
       // We add a tiny tie-breaker based on the index to ensure uniqueness if ties occur.
       const tieBreaker = (candidates.length - i) * 0.0001; 
       
+      // Source Match (represent Google/Tavily search signals)
+      const originalConfidence = candidate.sourceConfidence || 0;
+      if (originalConfidence > 50) {
+        const bonus = Math.min(30, Math.floor(originalConfidence * 0.4));
+        confidence += bonus;
+        reasons.push(`Source Match: +${bonus}`);
+      }
+
       // Cap at 99.9% max and at least 1% for any discovered profile
       confidence = Math.max(1, Math.min(confidence, 99.9));
-      
-      // PRESERVE the original source confidence (e.g. from search snippets) if it's higher 
-      // than the score calculated from scraped profile details (which often fail for social media).
-      const originalConfidence = candidate.sourceConfidence || 0;
-      confidence = Math.max(confidence, originalConfidence);
 
       confidence = confidence + tieBreaker;
 

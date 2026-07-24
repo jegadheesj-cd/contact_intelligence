@@ -13,20 +13,35 @@ export class SearchQueryBuilder {
 
   public buildLinkedInQueries(signals: IdentitySignals): string[] {
     const { name, company } = signals;
-    if (name && company) return [`site:linkedin.com/in "${name}" "${company}"`];
-    if (name) return [`site:linkedin.com/in "${name}"`];
-    if (company) return [`site:linkedin.com/in "${company}"`];
-    return [];
+    const queries: string[] = [];
+    if (name && company) {
+      queries.push(`site:linkedin.com/in "${name}" "${company}"`);
+      queries.push(`site:linkedin.com/in ${name} ${company}`);
+    } else if (name) {
+      queries.push(`site:linkedin.com/in "${name}"`);
+      queries.push(`site:linkedin.com/in ${name}`);
+    } else if (company) {
+      queries.push(`site:linkedin.com/in "${company}"`);
+    }
+    return queries;
   }
 
   public buildGitHubQueries(signals: IdentitySignals): string[] {
     const { name, company, email } = signals;
+    const queries: string[] = [];
     if (name) {
-      if (company) return [`site:github.com "${name}" "${company}"`];
-      if (email) return [`site:github.com "${name}" "${email}"`];
-      return [`site:github.com "${name}"`];
+      if (company) {
+        queries.push(`site:github.com "${name}" "${company}"`);
+        queries.push(`site:github.com ${name} ${company}`);
+      } else if (email) {
+        queries.push(`site:github.com "${name}" "${email}"`);
+        queries.push(`site:github.com ${name} ${email}`);
+      } else {
+        queries.push(`site:github.com "${name}"`);
+        queries.push(`site:github.com ${name}`);
+      }
     }
-    return [];
+    return queries;
   }
 
   public buildCompanyQueries(signals: IdentitySignals): string[] {
