@@ -74,6 +74,25 @@ export class FaceRecognitionController {
     }
   }
 
+  public async getProgress(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: {} });
+        return;
+      }
+
+      const progress = await faceService.getJobProgress(req.params.id);
+
+      res.status(200).json({
+        success: true,
+        message: 'Face recognition progress retrieved',
+        data: { progress },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   public async enroll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) {
@@ -127,6 +146,32 @@ export class FaceRecognitionController {
         success: true,
         message: 'Enrolled face signature successfully deleted',
         data: {},
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public async listHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Unauthorized', error: {} });
+        return;
+      }
+      
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const status = req.query.status as string;
+      const provider = req.query.provider as string;
+      const sortBy = req.query.sortBy as string || 'createdAt';
+      const order = (req.query.order as string) === 'asc' ? 'asc' : 'desc';
+
+      const history = await faceService.listSearchHistory(req.user.id, page, limit, status, provider, sortBy, order);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Face search history retrieved successfully',
+        data: history,
       });
     } catch (error) {
       next(error);

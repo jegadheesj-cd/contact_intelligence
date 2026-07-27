@@ -47,6 +47,7 @@ model User {
   tags          Tag[]
   notes         Note[]
   auditLogs     AuditLog[]
+  faceSearchHistory FaceSearchHistory[]
 
   @@map("users")
 }
@@ -221,4 +222,21 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@map("audit_logs")
+}
+
+model FaceSearchHistory {
+  id              String   @id @default(uuid())
+  uploadedImage   String
+  userId          String
+  providerUsed    String
+  candidateCount  Int      @default(0)
+  processingTime  Int      @default(0) // in milliseconds
+  status          String   // e.g., 'SUCCESS', 'FAILED', 'NO_MATCH'
+  confidence      Float    @default(0.0)
+  createdAt       DateTime @default(now())
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("face_search_history")
 }

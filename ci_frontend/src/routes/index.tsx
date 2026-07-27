@@ -13,6 +13,7 @@ import { ScannerPage } from '../features/scanner/pages/ScannerPage';
 import { QrScannerPage } from '../features/qr/pages/QrScannerPage';
 import { NfcReaderPage } from '../features/nfc/pages/NfcReaderPage';
 import { FaceMatchPage } from '../features/face/pages/FaceMatchPage';
+import { FaceHistoryPage } from '../features/face/pages/FaceHistoryPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
 export const router = createBrowserRouter([
@@ -73,6 +74,10 @@ export const router = createBrowserRouter([
           {
             path: '/face',
             element: <FaceMatchPage />,
+          },
+          {
+            path: '/face-history',
+            element: <FaceHistoryPage />,
           },
         ],
       },

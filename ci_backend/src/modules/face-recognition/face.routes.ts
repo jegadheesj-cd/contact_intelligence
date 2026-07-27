@@ -87,6 +87,26 @@ router.get('/profile/:id', authenticateJWT, controller.getProfile);
 
 /**
  * @openapi
+ * /api/face/profile/{id}/progress:
+ *   get:
+ *     summary: Get face verification analysis job progress
+ *     tags: [Face Recognition]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Progress percentage
+ */
+router.get('/profile/:id/progress', authenticateJWT, controller.getProgress);
+
+/**
+ * @openapi
  * /api/face/enroll:
  *   post:
  *     summary: Enroll a face biometric signature for a contact
@@ -147,5 +167,32 @@ router.get('/list', authenticateJWT, controller.list);
  *         description: Biometric signature successfully revoked
  */
 router.delete('/:id', authenticateJWT, controller.remove);
+
+/**
+ * @openapi
+ * /api/face/history:
+ *   get:
+ *     summary: List face search history logs
+ *     tags: [Face Recognition]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: page
+ *         in: query
+ *         schema:
+ *           type: integer
+ *       - name: limit
+ *         in: query
+ *         schema:
+ *           type: integer
+ *       - name: status
+ *         in: query
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Search history logs retrieved successfully
+ */
+router.get('/history', authenticateJWT, controller.listHistory);
 
 export default router;

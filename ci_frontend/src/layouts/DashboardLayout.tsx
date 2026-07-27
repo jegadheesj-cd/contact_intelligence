@@ -36,6 +36,7 @@ export const DashboardLayout: React.FC = () => {
     { name: 'QR Code', path: '/qr', icon: <QrCode className="h-5 w-5" /> },
     { name: 'NFC Reader', path: '/nfc', icon: <Nfc className="h-5 w-5" /> },
     { name: 'Face Match', path: '/face', icon: <UserCheck className="h-5 w-5" /> },
+    { name: 'Face History', path: '/face-history', icon: <ScanLine className="h-5 w-5" /> },
   ];
 
   return (

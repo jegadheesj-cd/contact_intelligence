@@ -3,6 +3,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import { parseContactString } from '../../utils/vcardParser';
+import { runGeminiOcrClassifier } from '../../utils/validationEngine';
 
 const execFilePromise = promisify(execFile);
 
@@ -31,14 +32,30 @@ export class QrService {
       }
 
       const decodedText = result.qr_data[0];
-      const parsedFields = parseContactString(decodedText);
+      const qrFields = parseContactString(decodedText);
+      const ocrFields = result.structured || {};
+
+      // Merge logic: QR data (vCard/URL) takes priority, missing fields fall back to OCR printed text
+      const mergedFields = {
+        name: qrFields.name || ocrFields.name || '',
+        company: qrFields.company || ocrFields.company || null,
+        designation: qrFields.designation || ocrFields.designation || null,
+        email: qrFields.email || ocrFields.email || null,
+        phone: qrFields.phone || ocrFields.phone || null,
+        website: qrFields.website || ocrFields.website || null,
+        address: qrFields.address || ocrFields.address || null,
+        linkedin_url: qrFields.linkedin_url || ocrFields.linkedin_url || null,
+      };
+
+      // Run through existing Business Card OCR verification pipeline for ultimate accuracy
+      const validation = await runGeminiOcrClassifier(result.ocr_text, mergedFields);
 
       return {
         decodedText,
-        parsedFields,
+        parsedFields: validation.fields,
         metadata: {
-          format: 'QR_CODE',
-          confidence: 1.0,
+          format: 'QR_CODE_WITH_OCR',
+          confidence: validation.understanding[0]?.confidence || 1.0,
           mimeType: file.mimetype,
           originalName: file.originalname,
         },
@@ -47,5 +64,20 @@ export class QrService {
       if (err instanceof AppError) throw err;
       throw new AppError(`QR decoding failed: ${err.message}`, 500);
     }
+  }
+
+  public processQrText(decodedText: string) {
+    if (!decodedText) {
+      throw new AppError('No QR text provided', 400);
+    }
+    const parsedFields = parseContactString(decodedText);
+    return {
+      decodedText,
+      parsedFields,
+      metadata: {
+        format: 'QR_CODE_LIVE',
+        confidence: 1.0,
+      },
+    };
   }
 }

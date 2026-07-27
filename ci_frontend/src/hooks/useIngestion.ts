@@ -50,6 +50,16 @@ export function useReadQrCode() {
   });
 }
 
+// Decodes live QR code text (from camera scanner)
+export function useParseQrText() {
+  return useMutation({
+    mutationFn: async (decodedText: string) => {
+      const response = await api.post<ApiResponse<QrReadResult>>('/qr/parse-text', { decodedText });
+      return response.data.data;
+    },
+  });
+}
+
 // 2. Records scanned NFC tag payloads
 export function useReadNfcTag() {
   const queryClient = useQueryClient();

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useReadQrCode } from '../../../hooks/useIngestion';
+import { useReadQrCode, useParseQrText } from '../../../hooks/useIngestion';
 import { useCreateContact } from '../../../hooks/useContacts';
 import { useToastStore } from '../../../store/useToastStore';
 import { Loader } from '../../../components/Loader';
@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   QrCode,
 } from 'lucide-react';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 
 export const QrScannerPage: React.FC = () => {
   const navigate = useNavigate();
@@ -21,13 +22,9 @@ export const QrScannerPage: React.FC = () => {
 
   // Workflow states: 'select' | 'camera' | 'decoding' | 'review' | 'error'
   const [step, setStep] = useState<'select' | 'camera' | 'decoding' | 'review' | 'error'>('select');
+  const [progressMessage, setProgressMessage] = useState('Reading QR Code...');
   const [localPreview, setLocalPreview] = useState<string>('');
   
-  // Camera stream refs
-  const streamRef = useRef<MediaStream | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
   // Drag and drop states
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -46,74 +43,69 @@ export const QrScannerPage: React.FC = () => {
 
   // Queries & Mutations hooks
   const readQrMutation = useReadQrCode();
+  const parseQrTextMutation = useParseQrText();
   const createContactMutation = useCreateContact();
 
-  // Unconditional stream track cleanup on unmount
   useEffect(() => {
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-      }
-    };
-  }, []);
+    if (step === 'camera') {
+      const scanner = new Html5QrcodeScanner(
+        'qr-reader',
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        false
+      );
 
-  // Reset file urls on unmount
-  useEffect(() => {
-    return () => {
-      if (localPreview) URL.revokeObjectURL(localPreview);
-      stopCamera();
-    };
-  }, [localPreview]);
+      scanner.render(
+        (decodedText) => {
+          scanner.clear();
+          performLiveDecode(decodedText);
+        },
+        (_error) => {
+          // ignore scan errors, they happen every frame a QR is not found
+        }
+      );
 
-  const startCamera = async () => {
-    setStep('camera');
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-        audio: false,
-      });
-      streamRef.current = mediaStream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
-    } catch (err: any) {
-      addToast('Could not access camera device.', 'error');
-      setStep('select');
+      return () => {
+        scanner.clear().catch(console.error);
+      };
+    } else if (step === 'decoding') {
+      setProgressMessage('Reading QR Code...');
+      const timer1 = setTimeout(() => setProgressMessage('Running OCR Extraction...'), 1500);
+      const timer2 = setTimeout(() => setProgressMessage('Merging and Validating Results...'), 4000);
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+      };
     }
+  }, [step]);
+
+  const startCamera = () => {
+    setStep('camera');
   };
 
   const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
+    // handled by Html5QrcodeScanner cleanup
   };
 
-  const captureFrameAndDecode = async () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
-
-    if (context) {
-      // Draw video frame to hidden canvas
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      // Convert canvas to blob
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-          addToast('Failed to capture frame.', 'error');
-          return;
-        }
-
-        const capturedFile = new File([blob], 'qr_capture.jpg', { type: 'image/jpeg' });
-        stopCamera();
-        setLocalPreview(URL.createObjectURL(capturedFile));
-        await performDecode(capturedFile);
-      }, 'image/jpeg');
+  const performLiveDecode = async (decodedText: string) => {
+    setStep('decoding');
+    try {
+      const response = await parseQrTextMutation.mutateAsync(decodedText);
+      const fields = response.parsedFields || {};
+      setFormFields({
+        name: fields.name || '',
+        company: fields.company || '',
+        designation: fields.designation || '',
+        email: fields.email || '',
+        phone: fields.phone || '',
+        website: fields.website || '',
+        address: fields.address || '',
+        linkedInUrl: fields.linkedin_url || '',
+      });
+      setStep('review');
+      addToast('Live QR Code successfully parsed.', 'success');
+    } catch (err: any) {
+      addToast(err.message || 'Live QR code decoding failed.', 'error');
+      setStep('error');
     }
   };
 
@@ -187,13 +179,13 @@ export const QrScannerPage: React.FC = () => {
     try {
       const response = await createContactMutation.mutateAsync({
         name: formFields.name,
-        company: formFields.company || null,
-        designation: formFields.designation || null,
-        email: formFields.email || null,
-        phone: formFields.phone || null,
-        website: formFields.website || null,
-        address: formFields.address || null,
-        linkedInUrl: formFields.linkedInUrl || null,
+        company: formFields.company || undefined,
+        designation: formFields.designation || undefined,
+        email: formFields.email || undefined,
+        phone: formFields.phone || undefined,
+        website: formFields.website || undefined,
+        address: formFields.address || undefined,
+        linkedInUrl: formFields.linkedInUrl || undefined,
         source: 'QR',
         skills: [],
         tags: ['QR Import'],
@@ -277,34 +269,11 @@ export const QrScannerPage: React.FC = () => {
 
       {/* STEP 2: Live Camera Viewfinder */}
       {step === 'camera' && (
-        <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden flex flex-col items-center justify-center relative min-h-[400px]">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            className="w-full max-h-[450px] object-cover"
-          />
-
-          {/* Scanner Viewport indicator overlay */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="h-56 w-56 border-2 border-indigo-500 rounded-2xl relative shadow-[0_0_0_9999px_rgba(15,23,42,0.6)]">
-              <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-indigo-400 -mt-0.5 -ml-0.5" />
-              <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-indigo-400 -mt-0.5 -mr-0.5" />
-              <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-indigo-400 -mb-0.5 -ml-0.5" />
-              <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-indigo-400 -mb-0.5 -mr-0.5" />
-            </div>
-          </div>
-
-          {/* hidden snapshot canvas */}
-          <canvas ref={canvasRef} className="hidden" />
-
-          {/* Controls Footer */}
-          <div className="absolute bottom-6 flex gap-3 z-10">
-            <Button onClick={handleReset} variant="outline" className="bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white">
-              Cancel
-            </Button>
-            <Button onClick={captureFrameAndDecode} className="flex items-center gap-1.5 font-bold shadow-lg">
-              <Camera className="h-4 w-4" /> Capture Frame
+        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-xs flex flex-col items-center justify-center min-h-[400px]">
+          <div id="qr-reader" className="w-full max-w-lg overflow-hidden rounded-xl border-2 border-indigo-100"></div>
+          <div className="mt-6 flex justify-center w-full">
+            <Button onClick={handleReset} variant="outline" className="w-full max-w-xs text-xs">
+              Cancel Camera Scan
             </Button>
           </div>
         </div>
@@ -313,7 +282,7 @@ export const QrScannerPage: React.FC = () => {
       {/* STEP 3: Decoding status */}
       {step === 'decoding' && (
         <div className="bg-white border border-slate-100 rounded-2xl p-12 text-center flex flex-col items-center justify-center shadow-xs min-h-[300px]">
-          <Loader message="Decoding QR contact payload..." size="lg" />
+          <Loader message={progressMessage} size="lg" />
         </div>
       )}
 

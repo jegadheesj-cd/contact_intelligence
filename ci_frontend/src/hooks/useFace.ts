@@ -39,3 +39,33 @@ export function useFaceRecord(id: string, isPolling: boolean = false) {
     refetchInterval: isPolling ? 1500 : false, // Poll every 1.5s while matching is processing
   });
 }
+
+// 3. Poll face recognition job progress
+export function useFaceProgress(id: string, isPolling: boolean = false) {
+  return useQuery<{ progress: number | object }>({
+    queryKey: ['face-progress', id],
+    queryFn: async () => {
+      const response = await api.get<ApiResponse<{ progress: number | object }>>(`/face/profile/${id}/progress`);
+      return response.data.data;
+    },
+    enabled: !!id && isPolling,
+    refetchInterval: isPolling ? 500 : false, // Poll rapidly for smooth UI progress
+  });
+}
+
+// 4. Fetch face search history
+export function useFaceHistory(page: number, limit: number, status?: string, provider?: string) {
+  return useQuery<any>({
+    queryKey: ['face-history', page, limit, status, provider],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
+      if (status) params.append('status', status);
+      if (provider) params.append('provider', provider);
+      
+      const response = await api.get<ApiResponse<any>>(`/face/history?${params.toString()}`);
+      return response.data.data;
+    },
+  });
+}

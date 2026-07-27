@@ -2,12 +2,24 @@ import type { Contact } from './contact';
 import type { UploadedFile } from './scanner';
 
 export interface FaceMatchResult {
-  matched: boolean;
-  contactId?: string | null;
-  similarityScore?: number;
-  boundingBox?: number[];
-  det_score?: number;
-  message?: string;
+  localMatch?: {
+    matched: boolean;
+    contactId?: string | null;
+    similarityScore?: number;
+    boundingBox?: number[];
+    det_score?: number;
+    message?: string;
+  };
+  osintMatch?: {
+    success: boolean;
+    provider?: string;
+    candidates?: Array<{
+      provider: string;
+      sourceUrl: string;
+      confidence: number;
+      metadata?: any;
+    }>;
+  };
 }
 
 export interface FaceRecord {

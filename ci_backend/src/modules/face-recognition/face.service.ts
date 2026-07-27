@@ -49,10 +49,16 @@ export class FaceRecognitionService {
     await faceRecognitionQueue.add(
       'process-face',
       { faceRecognitionId: faceRecord.id },
-      { attempts: 3, backoff: { type: 'exponential', delay: 5000 } }
+      { jobId: faceRecord.id, attempts: 3, backoff: { type: 'exponential', delay: 5000 } }
     );
 
     return faceRecord;
+  }
+
+  public async getJobProgress(jobId: string): Promise<number | object> {
+    const job = await faceRecognitionQueue.getJob(jobId);
+    if (!job) return 0;
+    return (job.progress as (number | object)) || 0;
   }
 
   public async getFaceRecord(userId: string, faceRecordId: string) {
@@ -214,9 +220,10 @@ export class FaceRecognitionService {
         mediaPath,
         isVideo ? 'true' : 'false',
       ]);
-      const jsonStart = stdout.indexOf('{');
-      if (jsonStart === -1) throw new Error("JSON payload not found in python output");
-      targetResult = JSON.parse(stdout.substring(jsonStart));
+      const lines = stdout.split('\n');
+      const jsonLine = lines.find((line: string) => line.trim().startsWith('{"success"'));
+      if (!jsonLine) throw new Error("JSON payload not found in python output");
+      targetResult = JSON.parse(jsonLine.trim());
     } catch (err: any) {
       throw new AppError(`Target face extraction failed: ${err.message}`, 500);
     }
@@ -235,7 +242,7 @@ export class FaceRecognitionService {
     } catch (_) {}
 
     // 3. Match using pgvector or fall back to JS similarity calculation
-    const threshold = 0.60;
+    const threshold = 0.20; // Lowered to 20% for demo purposes per user request
 
     if (isPgVectorAvailable) {
       const targetVectorStr = `[${targetEmbedding.join(',')}]`;
@@ -303,6 +310,40 @@ export class FaceRecognitionService {
         };
       }
     }
+  }
+
+  public async listSearchHistory(
+    userId: string,
+    page: number = 1,
+    limit: number = 10,
+    status?: string,
+    provider?: string,
+    sortBy: string = 'createdAt',
+    order: 'asc' | 'desc' = 'desc'
+  ) {
+    const where: any = { userId };
+    if (status) where.status = status;
+    if (provider) where.providerUsed = provider;
+
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      prisma.faceSearchHistory.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { [sortBy]: order },
+      }),
+      prisma.faceSearchHistory.count({ where }),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 }
 

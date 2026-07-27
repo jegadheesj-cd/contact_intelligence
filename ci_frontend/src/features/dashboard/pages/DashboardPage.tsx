@@ -228,6 +228,19 @@ export const DashboardPage: React.FC = () => {
               <p className="text-[11px] text-slate-400 mt-0.5">Import NDEF card data</p>
             </div>
           </button>
+
+          <button
+            onClick={() => navigate('/face')}
+            className="flex items-center gap-4 p-4 border border-slate-100 hover:border-fuchsia-100 hover:bg-fuchsia-50/20 rounded-xl text-left transition-all duration-200"
+          >
+            <div className="p-2.5 bg-fuchsia-50 border border-fuchsia-100 rounded-lg text-fuchsia-600">
+              <UserCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-800">Face Match OSINT</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Identify using face photo</p>
+            </div>
+          </button>
         </div>
       </div>
 

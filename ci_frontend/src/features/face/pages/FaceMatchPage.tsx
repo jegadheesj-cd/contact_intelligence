@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useUploadFacePhoto, useFaceRecord } from '../../../hooks/useFace';
+import { useUploadFacePhoto, useFaceRecord, useFaceProgress } from '../../../hooks/useFace';
 import { useToastStore } from '../../../store/useToastStore';
 import { Loader } from '../../../components/Loader';
 import { Button } from '../../../components/Button';
@@ -34,13 +34,15 @@ export const FaceMatchPage: React.FC = () => {
   const uploadMutation = useUploadFacePhoto();
   const isPolling = step === 'processing';
   const { data: record } = useFaceRecord(recordId, isPolling);
+  const { data: progressData } = useFaceProgress(recordId, isPolling);
+  const progress = typeof progressData?.progress === 'number' ? progressData.progress : 0;
 
   // Handle polling state changes
   useEffect(() => {
     if (record) {
       if (record.status === 'COMPLETED') {
         setStep('result');
-        if (record.recognizedResult?.matched) {
+        if (record.recognizedResult?.osintMatch?.success || record.recognizedResult?.localMatch?.matched) {
           addToast('Biometric match located.', 'success');
         } else {
           addToast('Biometric processing complete: no match found.', 'info');
@@ -226,13 +228,31 @@ export const FaceMatchPage: React.FC = () => {
       {/* STEP 3: Polling matching processing */}
       {step === 'processing' && (
         <div className="bg-white border border-slate-100 rounded-2xl p-12 text-center flex flex-col items-center justify-center shadow-xs min-h-[350px]">
-          <div className="relative mb-6">
-            <div className="h-16 w-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin" />
-            <UserCheck className="absolute inset-0 m-auto h-6 w-6 text-indigo-500 animate-pulse" />
+          <div className="relative mb-6 flex items-center justify-center">
+            <svg className="w-24 h-24 transform -rotate-90">
+              <circle cx="48" cy="48" r="44" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-slate-100" />
+              <circle cx="48" cy="48" r="44" stroke="currentColor" strokeWidth="6" fill="transparent"
+                strokeDasharray="276"
+                strokeDashoffset={276 - (276 * progress) / 100}
+                className="text-indigo-600 transition-all duration-500 ease-out" 
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-xl font-extrabold text-slate-800">{Math.round(progress)}%</span>
+            </div>
           </div>
           <h2 className="text-lg font-bold text-slate-800">Biometric Analysis Active</h2>
-          <p className="text-xs text-slate-400 mt-1 max-w-xs leading-relaxed">
-            Extracting vector embeddings, calculating cosine similarities, and matching signatures. This takes roughly 3-6 seconds...
+          <p className="text-sm text-indigo-600 mt-2 font-semibold tracking-wide uppercase">
+            {progress < 10 && "Initializing..."}
+            {progress >= 10 && progress < 30 && "Detecting & Validating Face"}
+            {progress >= 30 && progress < 60 && "Searching OSINT Providers"}
+            {progress >= 60 && progress < 75 && "Cross-referencing Candidates"}
+            {progress >= 75 && progress < 90 && "Verifying Identity"}
+            {progress >= 90 && progress < 100 && "Saving Contact Profile"}
+            {progress === 100 && "Finalizing Results"}
+          </p>
+          <p className="text-xs text-slate-400 mt-3 max-w-xs leading-relaxed">
+            Please wait while the system cross-references public signals.
           </p>
         </div>
       )}
@@ -255,20 +275,27 @@ export const FaceMatchPage: React.FC = () => {
 
           {/* Right panel: Match Details */}
           <div className="lg:col-span-2">
-            {record.recognizedResult?.matched ? (
+            {(record.recognizedResult?.osintMatch?.success && (record.recognizedResult?.osintMatch?.candidates?.length ?? 0) > 0) || record.recognizedResult?.localMatch?.matched ? (
               /* MATCH FOUND */
               <div className="bg-white border border-slate-100 rounded-xl shadow-xs p-6 flex flex-col gap-6">
                 {/* Visual verification alert */}
-                <div className="p-4 bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-xl flex items-center gap-3">
-                  <div className="p-2 bg-emerald-100 border border-emerald-200 rounded-lg text-emerald-700">
-                    <UserCheck className="h-5 w-5 shrink-0" />
+                <div className="p-4 bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-xl flex flex-col gap-1.5">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-100 border border-emerald-200 rounded-lg text-emerald-700">
+                      <UserCheck className="h-5 w-5 shrink-0" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold">Biometric Match Confirmed</h3>
+                      <p className="text-[11px] text-emerald-700/80 leading-relaxed mt-0.5">
+                        Face signatures verified via OSINT providers and Local Database.
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-bold">Biometric Match Confirmed</h3>
-                    <p className="text-[11px] text-emerald-700/80 leading-relaxed mt-0.5">
-                      Face signatures matched with similarity score of {(record.recognizedResult.similarityScore! * 100).toFixed(0)}%.
-                    </p>
-                  </div>
+                  {record.recognizedResult?.osintMatch?.success && (
+                    <div className="mt-2 text-xs font-semibold px-2 py-1 bg-emerald-100/50 rounded inline-block w-fit">
+                      OSINT Provider: {record.recognizedResult.osintMatch.provider}
+                    </div>
+                  )}
                 </div>
 
                 {/* Profile Card details */}
@@ -280,7 +307,7 @@ export const FaceMatchPage: React.FC = () => {
                         <div className="h-12 w-12 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm tracking-wide">
                           {record.contact.name
                             .split(/\s+/)
-                            .map((n) => n[0])
+                            .map((n: string) => n[0])
                             .join('')
                             .substring(0, 2)
                             .toUpperCase()}
@@ -297,7 +324,7 @@ export const FaceMatchPage: React.FC = () => {
                         variant="outline"
                         className="text-xs py-1.5 px-3 border border-indigo-200 text-indigo-600 hover:bg-indigo-50/30"
                       >
-                        View Profile
+                        View Full OSINT Profile
                       </Button>
                     </div>
                   ) : (
@@ -308,15 +335,15 @@ export const FaceMatchPage: React.FC = () => {
                 {/* Metrics */}
                 <div className="grid grid-cols-2 gap-4 border-t border-slate-100 pt-4">
                   <div>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none">Similarity Score</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none">Local Similarity Score</p>
                     <p className="text-lg font-extrabold text-slate-800 mt-1">
-                      {(record.recognizedResult.similarityScore! * 100).toFixed(1)}%
+                      {record.recognizedResult?.localMatch?.similarityScore ? (record.recognizedResult.localMatch.similarityScore * 100).toFixed(1) + '%' : 'N/A'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none">Liveness / Det Score</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none">OSINT Confidence</p>
                     <p className="text-lg font-extrabold text-slate-800 mt-1">
-                      {record.recognizedResult.det_score ? `${(record.recognizedResult.det_score * 100).toFixed(1)}%` : 'N/A'}
+                      {record.recognizedResult?.osintMatch?.candidates?.[0]?.confidence ? `${record.recognizedResult.osintMatch.candidates[0].confidence}%` : 'N/A'}
                     </p>
                   </div>
                 </div>
@@ -329,7 +356,7 @@ export const FaceMatchPage: React.FC = () => {
                 </div>
                 <h2 className="text-lg font-bold text-slate-800">No Match Found</h2>
                 <p className="text-xs text-slate-500 mt-1.5 max-w-sm leading-relaxed">
-                  The query facial signature was successfully parsed but similarity metrics fell below the 60% similarity verification threshold against all database profiles.
+                  The query facial signature was successfully parsed but similarity metrics fell below the 20% similarity verification threshold against all database profiles.
                 </p>
                 <div className="mt-6 flex gap-3">
                   <Button onClick={handleReset} className="text-xs py-1.5 px-4 font-bold">

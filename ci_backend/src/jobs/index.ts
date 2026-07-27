@@ -2,7 +2,7 @@ import { Worker, Job } from 'bullmq';
 import { connectionOptions, enrichmentQueue, aiSummaryQueue } from '../queue/queue';
 import prisma from '../config/db';
 import logger from '../config/logger';
-import { JobStatus, ContactSource } from '@prisma/client';
+import { JobStatus, ContactSource, Prisma } from '@prisma/client';
 import path from 'path';
 import fs from 'fs';
 import { execFile } from 'child_process';
@@ -13,12 +13,16 @@ import { FaceRecognitionService } from '../modules/face-recognition/face.service
 import { parseContactString } from '../utils/vcardParser';
 import { validateAndCorrectContact, runGeminiOcrClassifier } from '../utils/validationEngine';
 import { ContactsService } from '../modules/contacts/contacts.service';
+import { FaceSearchProviderManager } from '../modules/face-recognition/providers/FaceSearchProviderManager';
+import { CandidateVerificationService } from '../modules/face-recognition/services/CandidateVerificationService';
 
 const execFilePromise = promisify(execFile);
 const enrichmentService = new ProfileEnrichmentService();
 const aiSummaryService = new AiSummaryService();
 const faceService = new FaceRecognitionService();
 const contactsService = new ContactsService();
+const faceSearchManager = new FaceSearchProviderManager();
+const candidateVerificationService = new CandidateVerificationService();
 
 // 1. OCR Processing Worker
 export const ocrWorker = new Worker(
@@ -414,13 +418,19 @@ export const aiSummaryWorker = new Worker(
   { connection: connectionOptions }
 );
 
-// 4. Face Recognition Worker
+// 4. Face Recognition Worker (OSINT Pipeline)
 export const faceRecognitionWorker = new Worker(
   'face-recognition-queue',
   async (job: Job) => {
     const { faceRecognitionId } = job.data;
-    logger.info(`[Face Job] Started face recognition processing: ${faceRecognitionId}`);
+    logger.info(`[Face OSINT Pipeline] Started processing: ${faceRecognitionId}`);
     const startTime = Date.now();
+    let providerUsed = 'None';
+    let candidateCount = 0;
+    let confidenceScore = 0.0;
+    let finalStatus = 'NO_MATCH';
+    let userId = '';
+    let uploadedImagePath = '';
 
     try {
       const faceRecognition = await prisma.faceRecognition.findUnique({
@@ -432,64 +442,136 @@ export const faceRecognitionWorker = new Worker(
         throw new Error(`Face recognition or file upload not found for ID: ${faceRecognitionId}`);
       }
 
+      await job.updateProgress(10);
+      userId = faceRecognition.uploadedFile.userId;
+      uploadedImagePath = faceRecognition.uploadedFile.path;
+
       await prisma.faceRecognition.update({
         where: { id: faceRecognitionId },
         data: { status: JobStatus.PROCESSING },
       });
 
+      // 1. Face Quality Validation & Embedding Generation (using existing script)
       const isVideo = faceRecognition.uploadedFile.mimeType.startsWith('video/');
-
-      // Match face against database-enrolled faces
+      logger.info(`[Face OSINT Pipeline] STAGE: Extracting face embeddings`);
+      
       const matchResult = await faceService.matchFaceAgainstEnrolled(
-        faceRecognition.uploadedFile.userId,
-        faceRecognition.uploadedFile.path,
+        userId,
+        uploadedImagePath,
         isVideo
       );
 
-      // Save match results to DB
-      await prisma.faceRecognition.update({
-        where: { id: faceRecognitionId },
-        data: {
-          status: JobStatus.COMPLETED,
-          recognizedResult: matchResult,
-          contactId: matchResult.matched ? matchResult.contactId : null,
-        },
-      });
+      // Even if local match is found, we proceed to OSINT to discover public profiles.
+      await job.updateProgress(30);
 
-      // Update contact source if matched
-      if (matchResult.matched) {
-        await prisma.contact.update({
-          where: { id: matchResult.contactId },
-          data: { source: ContactSource.FACE_RECOGNITION },
-        });
+      // 2. Reverse Face Search
+      logger.info(`[Face OSINT Pipeline] STAGE: Reverse Face Search via Providers`);
+      const searchResponse = await faceSearchManager.search(uploadedImagePath);
+      await job.updateProgress(60);
+      providerUsed = searchResponse.provider;
+      candidateCount = searchResponse.candidates.length;
 
-        // Write timeline audit log
-        await prisma.auditLog.create({
-          data: {
-            userId: faceRecognition.uploadedFile.userId,
-            action: 'FACE_RECOGNITION_MATCHED',
-            entity: 'Contact',
-            entityId: matchResult.contactId,
-            details: {
-              similarityScore: matchResult.similarityScore,
-              processingTimeMs: Date.now() - startTime,
-            },
-          },
-        }).catch(() => {});
+      let contactId = matchResult.matched ? matchResult.contactId : null;
+
+      if (searchResponse.success && searchResponse.candidates.length > 0) {
+        // 3. Candidate Verification
+        logger.info(`[Face OSINT Pipeline] STAGE: Candidate Verification`);
+        const verifiedCandidates = candidateVerificationService.verifyCandidates(searchResponse.candidates, matchResult.similarityScore || 0);
+        await job.updateProgress(75);
+        
+        if (verifiedCandidates.length > 0) {
+          finalStatus = 'SUCCESS';
+          confidenceScore = verifiedCandidates[0].confidence;
+          const bestCandidate = verifiedCandidates[0]; // Take highest confidence
+
+          // 4. Create/Update Contact with initial candidate data
+          if (!contactId) {
+            const newContact = await prisma.contact.create({
+              data: {
+                userId,
+                name: bestCandidate.title || 'Unknown Face Match',
+                website: bestCandidate.url,
+                source: ContactSource.FACE_RECOGNITION,
+              }
+            });
+            contactId = newContact.id;
+          } else {
+             // Merge new link into existing contact
+             await prisma.contact.update({
+               where: { id: contactId },
+               data: { website: bestCandidate.url }
+             });
+          }
+
+          // 5. Trigger ProfileDiscoveryEngine to enrich this verified URL
+          logger.info(`[Face OSINT Pipeline] STAGE: Profile Enrichment Triggered for ${contactId}`);
+          await enrichmentService.triggerEnrichment(userId, contactId).catch(err => {
+             logger.warn(`Failed to trigger Profile Enrichment: ${err.message}`);
+          });
+        }
+      } else if (matchResult.matched) {
+         // Local match only
+         finalStatus = 'SUCCESS_LOCAL_ONLY';
+         confidenceScore = matchResult.similarityScore;
       }
 
-      logger.info(`[Face Job] Completed face recognition processing: ${faceRecognitionId} in ${Date.now() - startTime}ms`);
+      // 6. Save match results and Search History via Transaction
+      const processingTime = Date.now() - startTime;
+      await job.updateProgress(90);
+      
+      await prisma.$transaction([
+        prisma.faceRecognition.update({
+          where: { id: faceRecognitionId },
+          data: {
+            status: JobStatus.COMPLETED,
+            recognizedResult: {
+               localMatch: matchResult,
+               osintMatch: searchResponse
+            } as unknown as Prisma.InputJsonValue,
+            contactId: contactId,
+          },
+        }),
+        prisma.faceSearchHistory.create({
+          data: {
+             uploadedImage: uploadedImagePath,
+             userId: userId,
+             providerUsed: providerUsed,
+             candidateCount: candidateCount,
+             processingTime: processingTime,
+             status: finalStatus,
+             confidence: confidenceScore,
+          }
+        })
+      ]);
+
+      await job.updateProgress(100);
+      logger.info(`[Face OSINT Pipeline] Completed processing: ${faceRecognitionId} in ${processingTime}ms`);
     } catch (error: any) {
-      logger.error(`[Face Job] Error on face recognition ${faceRecognitionId}:`);
+      logger.error(`[Face OSINT Pipeline] Error on ${faceRecognitionId}:`);
       logger.error(error.stack || error.message);
+      
       await prisma.faceRecognition.update({
         where: { id: faceRecognitionId },
         data: { status: JobStatus.FAILED },
-      }).catch((dbErr) => logger.error(`[Face Job] Failed to update status: ${dbErr.message}`));
+      }).catch((dbErr) => logger.error(`[Face OSINT] Failed to update status: ${dbErr.message}`));
+      
+      if (userId && uploadedImagePath) {
+         await prisma.faceSearchHistory.create({
+           data: {
+              uploadedImage: uploadedImagePath,
+              userId: userId,
+              providerUsed: providerUsed,
+              candidateCount: 0,
+              processingTime: Date.now() - startTime,
+              status: 'FAILED',
+              confidence: 0.0,
+           }
+         }).catch(() => {});
+      }
       throw error;
     }
   },
-  { connection: connectionOptions }
+  { connection: connectionOptions, concurrency: 5, lockDuration: 60000 }
 );
 
 // Error and failure event listeners for BullMQ Workers

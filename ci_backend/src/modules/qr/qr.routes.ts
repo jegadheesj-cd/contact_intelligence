@@ -39,4 +39,29 @@ const controller = new QrController();
  */
 router.post('/read', authenticateJWT, upload.single('qrImage'), controller.read);
 
+/**
+ * @openapi
+ * /api/qr/parse-text:
+ *   post:
+ *     summary: Parse contact information from a decoded QR code string (live camera)
+ *     tags: [QR Ingestion]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - decodedText
+ *             properties:
+ *               decodedText:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: QR text successfully parsed
+ */
+router.post('/parse-text', authenticateJWT, controller.parseText);
+
 export default router;

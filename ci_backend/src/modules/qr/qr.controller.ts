@@ -20,4 +20,21 @@ export class QrController {
       next(error);
     }
   }
+
+  public async parseText(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { decodedText } = req.body;
+      if (!decodedText) {
+        throw new AppError('No decodedText provided in request body', 400);
+      }
+      const data = qrService.processQrText(decodedText);
+      res.status(200).json({
+        success: true,
+        message: 'QR Code text processed successfully',
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
