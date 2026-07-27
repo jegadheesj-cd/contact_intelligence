@@ -358,12 +358,20 @@ Output strict JSON format ONLY. Do not include markdown blocks (\`\`\`json).
         for (const rank of parsed.rankings) {
           const candidate = topCandidates[rank.candidateId];
           if (candidate) {
-            candidate.sourceConfidence = Math.max(0, Math.min(candidate.sourceConfidence + rank.confidenceAdjustment, 100));
-            const aiReason = `AI Verification: ${rank.reason}`;
-            (candidate as any).verificationReasons = [...((candidate as any).verificationReasons || []), aiReason];
-            if (candidate.publicProfiles.length > 0) {
-              candidate.publicProfiles[0].reasons = [...(candidate.publicProfiles[0].reasons || []), aiReason];
-              candidate.publicProfiles[0].confidence = candidate.sourceConfidence;
+            if (candidate.source === 'Company Website') {
+              const aiReason = `AI Verification bypassed for official Company Profile`;
+              (candidate as any).verificationReasons = [...((candidate as any).verificationReasons || []), aiReason];
+              if (candidate.publicProfiles.length > 0) {
+                candidate.publicProfiles[0].reasons = [...(candidate.publicProfiles[0].reasons || []), aiReason];
+              }
+            } else {
+              candidate.sourceConfidence = Math.max(0, Math.min(candidate.sourceConfidence + rank.confidenceAdjustment, 100));
+              const aiReason = `AI Verification: ${rank.reason}`;
+              (candidate as any).verificationReasons = [...((candidate as any).verificationReasons || []), aiReason];
+              if (candidate.publicProfiles.length > 0) {
+                candidate.publicProfiles[0].reasons = [...(candidate.publicProfiles[0].reasons || []), aiReason];
+                candidate.publicProfiles[0].confidence = candidate.sourceConfidence;
+              }
             }
           }
         }

@@ -10,7 +10,7 @@ async function run() {
   console.log('====================================================');
   
   let contact = await prisma.contact.findFirst({
-    where: { name: 'Jegadhees J' },
+    where: { name: 'Kanishka Ramakrishnan' },
     include: { professionalProfile: true, tags: true, notes: true }
   });
 

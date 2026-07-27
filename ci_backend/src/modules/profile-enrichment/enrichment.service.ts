@@ -3,7 +3,7 @@ import prisma from '../../config/db';
 import { AppError } from '../../utils/AppError';
 import logger from '../../config/logger';
 import { generateTextWithFallback } from '../../utils/aiClient';
-
+import { stringSimilarity } from '../../utils/stringUtils';
 import { IdentityResolver } from './services/IdentityResolver';
 import { SearchIntelligenceEngine } from './services/SearchIntelligenceEngine';
 import { ProfileDiscoveryEngine, CandidateProfile } from './services/ProfileDiscoveryEngine';
@@ -144,13 +144,42 @@ export class ProfileEnrichmentService {
 
     // Prepare provider responses for ALL candidates (sorted by final confidence descending)
     const providersUsed = Array.from(new Set(identityResolvedCandidates.map(c => c.source)));
-    const providerResponses: ProviderResponse[] = identityResolvedCandidates
-      .filter(c => c.sourceConfidence >= 40)
-      .map(c => ({
-      sourceName: c.source,
-      confidence: c.sourceConfidence,
-      data: c
-    }));
+    
+    // Group by platform and deduplicate
+    const platformGroups: Record<string, CandidateProfile[]> = {};
+    for (const c of identityResolvedCandidates) {
+      if (c.sourceConfidence < 40) continue;
+      
+      const pform = c.publicProfiles[0]?.platform || 'Other';
+      if (!platformGroups[pform]) platformGroups[pform] = [];
+      
+      // Deduplicate: If same person (high name + company match) on same platform, skip
+      const isDup = platformGroups[pform].some(existing => {
+        const nameSim = stringSimilarity(c.fullName.toLowerCase(), existing.fullName.toLowerCase());
+        const compSim = c.company && existing.company ? stringSimilarity(c.company.toLowerCase(), existing.company.toLowerCase()) : 0;
+        return nameSim > 0.85 && compSim > 0.8;
+      });
+      
+      if (!isDup) {
+        platformGroups[pform].push(c);
+      }
+    }
+
+    const providerResponses: ProviderResponse[] = [];
+    for (const [pform, groupCands] of Object.entries(platformGroups)) {
+      // Top 5 per platform
+      const top5 = groupCands.slice(0, 5);
+      top5.forEach(c => {
+        providerResponses.push({
+          sourceName: c.source,
+          confidence: c.sourceConfidence,
+          data: c
+        });
+      });
+    }
+
+    // Re-sort provider responses globally by confidence
+    providerResponses.sort((a, b) => b.confidence - a.confidence);
 
     const bestCandidate = identityResolvedCandidates[0] || null;
     const bestVerification = bestCandidate ? {

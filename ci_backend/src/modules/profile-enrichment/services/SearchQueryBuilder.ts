@@ -45,10 +45,15 @@ export class SearchQueryBuilder {
   }
 
   public buildCompanyQueries(signals: IdentitySignals): string[] {
-    const { name, company } = signals;
+    const { company } = signals;
     if (company) {
-      if (name) return [`"${company}" "${name}" team OR leadership`];
-      return [`"${company}" website`];
+      return [
+        `"${company}" official website`,
+        `"${company}" about us`,
+        `"${company}" leadership`,
+        `"${company}" team`,
+        `"${company}" company`
+      ];
     }
     return [];
   }

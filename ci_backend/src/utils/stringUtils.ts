@@ -37,3 +37,35 @@ export function stringSimilarity(s1: string, s2: string): number {
   if (maxLen === 0) return 1.0;
   return (maxLen - distance) / maxLen;
 }
+
+/**
+ * Normalizes a company name by trimming and removing common corporate suffixes.
+ */
+export function normalizeCompanyName(company: string | null | undefined): string | null {
+  if (!company) return null;
+  let normalized = company.trim();
+  
+  // Suffixes to remove. Use word boundaries where applicable, or just end of string matches
+  const suffixes = [
+    /\bprivate\s+limited\b/i,
+    /\bpvt\s+ltd\.?/i,
+    /\bpvt\.?\s+ltd\.?/i,
+    /\binc\.?/i,
+    /\bllc\.?/i,
+    /\bcorp\.?/i,
+    /\bcorporation\b/i,
+    /\blimited\b/i,
+    /\bltd\.?/i,
+    /\bco\.?/i,
+    /\bcompany\b/i
+  ];
+
+  for (const suffix of suffixes) {
+    normalized = normalized.replace(new RegExp(suffix.source + '$', 'i'), '').trim();
+  }
+  
+  // Remove trailing non-alphanumeric chars (like commas, hyphens)
+  normalized = normalized.replace(/[,|\-]$/, '').trim();
+  
+  return normalized || null;
+}

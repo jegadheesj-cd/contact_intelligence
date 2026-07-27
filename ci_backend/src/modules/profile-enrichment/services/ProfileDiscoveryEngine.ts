@@ -4,7 +4,7 @@ import { SearchQueryBuilder } from './SearchQueryBuilder';
 import { ProviderManager } from './providers/ProviderManager';
 import { ProviderError } from './providers/ISearchProvider';
 import { CheerioParser } from './CheerioParser';
-import { stringSimilarity } from '../../../utils/stringUtils';
+import { stringSimilarity, normalizeCompanyName } from '../../../utils/stringUtils';
 
 export interface CandidateProfile {
   fullName: string;
@@ -42,6 +42,13 @@ export interface CandidateProfile {
   source: string;
   sourceConfidence: number;
   verificationStatus?: string;
+  explainability?: {
+    confidence: number;
+    matchedSignals: string[];
+    missingSignals: string[];
+    penalties: string[];
+    verification: string;
+  };
 }
 
 export interface DiscoveryResult {
@@ -60,6 +67,21 @@ export class ProfileDiscoveryEngine {
   private queryBuilder = new SearchQueryBuilder();
   private providerManager = new ProviderManager();
   private cheerioParser = new CheerioParser();
+
+  private filterCompanyWebsiteUrl(url: string): { valid: boolean, reason?: string } {
+    const lUrl = url.toLowerCase();
+    if (lUrl.includes('linkedin.com/company')) return { valid: false, reason: 'LinkedIn company page' };
+    if (lUrl.includes('linkedin.com')) return { valid: false, reason: 'LinkedIn profile' };
+    if (lUrl.includes('crunchbase.com')) return { valid: false, reason: 'Crunchbase directory' };
+    if (lUrl.includes('zoominfo.com')) return { valid: false, reason: 'Zoominfo directory' };
+    if (lUrl.includes('pitchbook.com')) return { valid: false, reason: 'Pitchbook directory' };
+    if (lUrl.includes('bloomberg.com')) return { valid: false, reason: 'Bloomberg profile' };
+    if (lUrl.includes('forbes.com')) return { valid: false, reason: 'Forbes profile' };
+    if (lUrl.includes('wikipedia.org')) return { valid: false, reason: 'Wikipedia article' };
+    if (lUrl.includes('instagram.com') || lUrl.includes('facebook.com') || lUrl.includes('twitter.com') || lUrl.includes('x.com')) return { valid: false, reason: 'Social media' };
+    if (lUrl.includes('glassdoor.') || lUrl.includes('indeed.')) return { valid: false, reason: 'Job board directory' };
+    return { valid: true };
+  }
 
   /**
    * Main discovery method — discovers all candidate profiles from all sources in parallel.
@@ -92,9 +114,7 @@ export class ProfileDiscoveryEngine {
     const discoveredGitHubUrls = new Set<string>();
     const discoveredCompanyUrls = new Set<string>();
     const discoveredPortfolioUrls = new Set<string>();
-    const discoveredInstagramUrls = new Map<string, { title: string; description: string }>();
-    const discoveredFacebookUrls = new Map<string, { title: string; description: string }>();
-    const discoveredTwitterUrls = new Map<string, { title: string; description: string }>();
+
 
     const trackSearchProviderResults = (results: any[], providerName: string) => {
       const current = searchProcess[providerName] || "0 Results";
@@ -116,9 +136,7 @@ export class ProfileDiscoveryEngine {
     const linkedinQueries = this.queryBuilder.buildLinkedInQueries(signals);
     const githubQueries = this.queryBuilder.buildGitHubQueries(signals);
     const companyQueries = this.queryBuilder.buildCompanyQueries(signals);
-    const instagramQueries = this.queryBuilder.buildInstagramQueries(signals);
-    const facebookQueries = this.queryBuilder.buildFacebookQueries(signals);
-    const twitterQueries = this.queryBuilder.buildTwitterQueries(signals);
+
 
     // 2. Discover LinkedIn URLs via queries
     for (const query of linkedinQueries) {
@@ -145,17 +163,31 @@ export class ProfileDiscoveryEngine {
     if (signals.website && !signals.website.includes('linkedin.com') && !signals.website.includes('github.com')) {
       discoveredCompanyUrls.add(signals.website);
     }
+    
+    if (signals.company) {
+      logger.info(`[ProfileDiscoveryEngine] Detected Company: ${contact.company || signals.company}`);
+      logger.info(`[ProfileDiscoveryEngine] Normalized Company: ${signals.company}`);
+    }
+
     for (const query of companyQueries) {
       searchQueries.push(query);
       try {
-        logger.info(`[ProfileDiscoveryEngine] Searching for Company Website using query: "${query}"`);
+        logger.info(`[ProfileDiscoveryEngine] Generated Search Query: "${query}"`);
         const response = await this.providerManager.search(query);
         trackSearchProviderResults(response.results, response.provider);
+        
+        logger.info(`[ProfileDiscoveryEngine] Returned URLs for "${query}": ${response.results.map(r => r.url).join(', ')}`);
 
         for (const res of response.results) {
-          if (res.url && !res.url.includes('linkedin.com') && !res.url.includes('github.com') && !res.url.includes('wikipedia.org')) {
-            discoveredCompanyUrls.add(res.url);
-            allDiscoveredUrls.push({ url: res.url, source: 'company-website-search' });
+          if (res.url) {
+            const filter = this.filterCompanyWebsiteUrl(res.url);
+            if (filter.valid) {
+              logger.info(`[ProfileDiscoveryEngine] Accepted Company Website: ${res.url}`);
+              discoveredCompanyUrls.add(res.url);
+              allDiscoveredUrls.push({ url: res.url, source: 'company-website-search' });
+            } else {
+              logger.info(`[ProfileDiscoveryEngine] Rejected URL: ${res.url} - Reason: ${filter.reason}`);
+            }
           }
         }
       } catch (e: any) {
@@ -204,74 +236,59 @@ export class ProfileDiscoveryEngine {
       }
     }
 
-    // 6. Discover Instagram URLs
-    for (const query of instagramQueries) {
-      searchQueries.push(query);
-      try {
-        logger.info(`[ProfileDiscoveryEngine] Searching for Instagram profiles using query: "${query}"`);
-        const response = await this.providerManager.search(query);
-        trackSearchProviderResults(response.results, response.provider);
+    // 5.5. Dynamic Company Website Discovery (Harvesting from LinkedIn results)
+    if (!signals.company) {
+      let newlyDiscoveredCompany: string | null = null;
+      for (const [url, meta] of discoveredLinkedInUrls.entries()) {
+        const parsed = this.parseLinkedInTitle(meta.title, signals.name, undefined, undefined);
+        if (parsed.company) {
+          newlyDiscoveredCompany = normalizeCompanyName(parsed.company);
+          break; // Use the first valid company name found
+        }
+      }
+      
+      if (newlyDiscoveredCompany) {
+        logger.info(`[ProfileDiscoveryEngine] Detected Company (Dynamic): ${newlyDiscoveredCompany}`);
+        logger.info(`[ProfileDiscoveryEngine] Normalized Company: ${newlyDiscoveredCompany}`);
+        // Mutate signals so that the Ranking engine downstream has a company to match against
+        signals.company = newlyDiscoveredCompany; 
+        
+        const dynamicCompanyQueries = this.queryBuilder.buildCompanyQueries(signals);
+        for (const query of dynamicCompanyQueries) {
+          searchQueries.push(query);
+          try {
+            logger.info(`[ProfileDiscoveryEngine] Generated Search Query: "${query}"`);
+            const response = await this.providerManager.search(query);
+            trackSearchProviderResults(response.results, response.provider);
+            
+            logger.info(`[ProfileDiscoveryEngine] Returned URLs for "${query}": ${response.results.map(r => r.url).join(', ')}`);
 
-        for (const res of response.results) {
-          if (res.url.includes('instagram.com/') && !res.url.includes('/explore') && !res.url.includes('/tags') && !res.url.includes('/locations')) {
-            discoveredInstagramUrls.set(res.url, { title: res.title || '', description: res.snippet || '' });
-            allDiscoveredUrls.push({ url: res.url, source: 'instagram-discovery-search' });
+            for (const res of response.results) {
+              if (res.url) {
+                const filter = this.filterCompanyWebsiteUrl(res.url);
+                if (filter.valid) {
+                  logger.info(`[ProfileDiscoveryEngine] Accepted Company Website: ${res.url}`);
+                  discoveredCompanyUrls.add(res.url);
+                  allDiscoveredUrls.push({ url: res.url, source: 'dynamic-company-website-search' });
+                } else {
+                  logger.info(`[ProfileDiscoveryEngine] Rejected URL: ${res.url} - Reason: ${filter.reason}`);
+                }
+              }
+            }
+          } catch (e: any) {
+            if (e.name === 'ProviderError') throw e;
+            logger.warn(`[ProfileDiscoveryEngine] Dynamic Company Web Search failed: ${e.message}`);
           }
         }
-      } catch (e: any) {
-        if (e.name === 'ProviderError') throw e;
-        logger.warn(`[ProfileDiscoveryEngine] Instagram Search failed for query "${query}": ${e.message}`);
-        rejectionReasons.push(`Instagram search failed: ${e.message}`);
       }
     }
 
-    // 7. Discover Facebook URLs
-    for (const query of facebookQueries) {
-      searchQueries.push(query);
-      try {
-        logger.info(`[ProfileDiscoveryEngine] Searching for Facebook profiles using query: "${query}"`);
-        const response = await this.providerManager.search(query);
-        trackSearchProviderResults(response.results, response.provider);
-
-        for (const res of response.results) {
-          if (res.url.includes('facebook.com/') && !res.url.includes('/groups') && !res.url.includes('/events') && !res.url.includes('/marketplace')) {
-            discoveredFacebookUrls.set(res.url, { title: res.title || '', description: res.snippet || '' });
-            allDiscoveredUrls.push({ url: res.url, source: 'facebook-discovery-search' });
-          }
-        }
-      } catch (e: any) {
-        if (e.name === 'ProviderError') throw e;
-        logger.warn(`[ProfileDiscoveryEngine] Facebook Search failed for query "${query}": ${e.message}`);
-        rejectionReasons.push(`Facebook search failed: ${e.message}`);
-      }
-    }
-
-    // 8. Discover Twitter/X URLs
-    for (const query of twitterQueries) {
-      searchQueries.push(query);
-      try {
-        logger.info(`[ProfileDiscoveryEngine] Searching for Twitter/X profiles using query: "${query}"`);
-        const response = await this.providerManager.search(query);
-        trackSearchProviderResults(response.results, response.provider);
-
-        for (const res of response.results) {
-          if ((res.url.includes('twitter.com/') || res.url.includes('x.com/')) && !res.url.includes('/search') && !res.url.includes('/hashtag') && !res.url.includes('/i/')) {
-            discoveredTwitterUrls.set(res.url, { title: res.title || '', description: res.snippet || '' });
-            allDiscoveredUrls.push({ url: res.url, source: 'twitter-discovery-search' });
-          }
-        }
-      } catch (e: any) {
-        if (e.name === 'ProviderError') throw e;
-        logger.warn(`[ProfileDiscoveryEngine] Twitter/X Search failed for query "${query}": ${e.message}`);
-        rejectionReasons.push(`Twitter/X search failed: ${e.message}`);
-      }
-    }
 
     // ─── Parallel Ingestions / BeautifulSoup Parsers ──────────────────────────
     logger.info(`[ProfileDiscoveryEngine] Executing stage: Evidence Collection & BeautifulSoup Parsing`);
 
-    // Fetch GitHub Details for up to 3 candidates
-    const githubUrlsList = Array.from(discoveredGitHubUrls).slice(0, 3);
+    // Fetch GitHub Details for candidates
+    const githubUrlsList = Array.from(discoveredGitHubUrls).slice(0, 10);
     const githubPromises = githubUrlsList.map(url =>
       this.fetchGitHubDetails(url).catch(e => {
         logger.error(`[ProfileDiscoveryEngine] GitHub Collector failure for ${url}: ${e.message}`);
@@ -280,8 +297,8 @@ export class ProfileDiscoveryEngine {
       })
     );
 
-    // Scrape Company Websites for up to 2 candidates
-    const companyUrlsList = Array.from(discoveredCompanyUrls).slice(0, 2);
+    // Scrape Company Websites for candidates
+    const companyUrlsList = Array.from(discoveredCompanyUrls).slice(0, 10);
     const companyWebPromises = companyUrlsList.map(url =>
       this.scrapeCompanyWebsite(url, signals.name).catch(e => {
         logger.error(`[ProfileDiscoveryEngine] Cheerio Web Scraper failure for ${url}: ${e.message}`);
@@ -290,8 +307,8 @@ export class ProfileDiscoveryEngine {
       })
     );
 
-    // Scrape Portfolios for up to 2 candidates
-    const portfolioUrlsList = Array.from(discoveredPortfolioUrls).slice(0, 2);
+    // Scrape Portfolios for candidates
+    const portfolioUrlsList = Array.from(discoveredPortfolioUrls).slice(0, 10);
     const portfolioPromises = portfolioUrlsList.map(url =>
       this.scrapePortfolio(url).catch(e => {
         logger.error(`[ProfileDiscoveryEngine] Portfolio Parser failure for ${url}: ${e.message}`);
@@ -300,51 +317,21 @@ export class ProfileDiscoveryEngine {
       })
     );
 
-    // Attempt to scrape public social profiles for up to 3 candidates each
-    const instagramUrlsList = Array.from(discoveredInstagramUrls.entries()).slice(0, 3);
-    const instagramPromises = instagramUrlsList.map(([url]) =>
-      this.scrapeSocialProfile(url, 'Instagram').catch(e => {
-        logger.warn(`[ProfileDiscoveryEngine] Instagram scrape failed for ${url}: ${e.message}`);
-        return null;
-      })
-    );
-
-    const facebookUrlsList = Array.from(discoveredFacebookUrls.entries()).slice(0, 3);
-    const facebookPromises = facebookUrlsList.map(([url]) =>
-      this.scrapeSocialProfile(url, 'Facebook').catch(e => {
-        logger.warn(`[ProfileDiscoveryEngine] Facebook scrape failed for ${url}: ${e.message}`);
-        return null;
-      })
-    );
-
-    const twitterUrlsList = Array.from(discoveredTwitterUrls.entries()).slice(0, 3);
-    const twitterPromises = twitterUrlsList.map(([url]) =>
-      this.scrapeSocialProfile(url, 'Twitter/X').catch(e => {
-        logger.warn(`[ProfileDiscoveryEngine] Twitter/X scrape failed for ${url}: ${e.message}`);
-        return null;
-      })
-    );
-
-    const [githubDataArray, companyWebDataArray, portfolioDataArray, instagramDataArray, facebookDataArray, twitterDataArray] = await Promise.all([
+    const [githubDataArray, companyWebDataArray, portfolioDataArray] = await Promise.all([
       Promise.all(githubPromises),
       Promise.all(companyWebPromises),
-      Promise.all(portfolioPromises),
-      Promise.all(instagramPromises),
-      Promise.all(facebookPromises),
-      Promise.all(twitterPromises)
+      Promise.all(portfolioPromises)
     ]);
 
     // Update searchProcess logs with API scraper details
     searchProcess["GitHub API"] = `${githubDataArray.filter(Boolean).length} Results`;
     searchProcess["Company Website"] = `${companyWebDataArray.filter(Boolean).length} Results`;
-    searchProcess["Instagram Discovery"] = `${discoveredInstagramUrls.size} Found, ${instagramDataArray.filter(Boolean).length} Scraped`;
-    searchProcess["Facebook Discovery"] = `${discoveredFacebookUrls.size} Found, ${facebookDataArray.filter(Boolean).length} Scraped`;
-    searchProcess["Twitter/X Discovery"] = `${discoveredTwitterUrls.size} Found, ${twitterDataArray.filter(Boolean).length} Scraped`;
+
 
     const candidates: CandidateProfile[] = [];
 
     // Step 6: Add LinkedIn candidates (Do NOT scrape)
-    const linkedinUrlsList = Array.from(discoveredLinkedInUrls.entries()).slice(0, 5);
+    const linkedinUrlsList = Array.from(discoveredLinkedInUrls.entries()).slice(0, 20);
     for (const [url, meta] of linkedinUrlsList) {
       // Evaluate each LinkedIn URL individually using search result metadata
       const urlScore = this.evaluateLinkedInUrlCandidate(signals, url, meta.title, meta.description);
@@ -403,13 +390,15 @@ export class ProfileDiscoveryEngine {
     for (let idx = 0; idx < companyUrlsList.length; idx++) {
       const url = companyUrlsList[idx];
       const companyWebData = companyWebDataArray[idx];
-      candidates.push({
-        fullName: signals.name,
+      const candidate: CandidateProfile = {
+        fullName: companyWebData?.companyName || signals.company || 'Company Website',
         company: signals.company || companyWebData?.companyName || undefined,
-        designation: signals.designation || undefined,
+        designation: companyWebData?.industry || signals.designation || undefined,
+        location: companyWebData?.headquarters || undefined,
         companyBio: companyWebData?.about,
         companyRole: companyWebData?.leadership?.find((l: any) => stringSimilarity(l.name, signals.name) > 0.6)?.designation,
         companyDepartment: companyWebData?.leadership?.find((l: any) => stringSimilarity(l.name, signals.name) > 0.6)?.department,
+        profileImage: companyWebData?.logo || undefined,
         experience: [],
         education: [],
         skills: [],
@@ -418,7 +407,9 @@ export class ProfileDiscoveryEngine {
         source: 'Company Website',
         sourceConfidence: 90,
         verificationStatus: 'Verified'
-      });
+      };
+      candidates.push(candidate);
+      logger.info(`[ProfileDiscoveryEngine] Final Company Profile: ${JSON.stringify(candidate)}`);
     }
 
     // Step 9: Add Portfolio website candidate details
@@ -440,83 +431,7 @@ export class ProfileDiscoveryEngine {
       });
     }
 
-    // Step 10: Add Instagram candidates
-    for (let idx = 0; idx < instagramUrlsList.length; idx++) {
-      const [url, meta] = instagramUrlsList[idx];
-      const socialData = instagramDataArray[idx];
-      const urlScore = this.evaluateSocialUrlCandidate(signals, url, meta.title, meta.description, 'Instagram');
-      logger.info(`[ProfileDiscoveryEngine] Instagram URL evaluated: ${url} → Score: ${urlScore}%`);
-      candidates.push({
-        fullName: socialData?.displayName || signals.name,
-        company: signals.company || undefined,
-        designation: signals.designation || undefined,
-        headline: socialData?.bio || undefined,
-        summary: socialData?.bio || undefined,
-        experience: [],
-        education: [],
-        skills: [],
-        projects: [],
-        publicProfiles: [{ platform: 'Instagram', url, confidence: urlScore, reasons: [
-          `Name match: ${meta.title}`,
-          `Search snippet: ${meta.description.substring(0, 80)}`
-        ] }],
-        source: 'Instagram Discovery',
-        sourceConfidence: urlScore,
-        verificationStatus: urlScore >= 70 ? 'Verified' : 'Unverified'
-      });
-    }
 
-    // Step 11: Add Facebook candidates
-    for (let idx = 0; idx < facebookUrlsList.length; idx++) {
-      const [url, meta] = facebookUrlsList[idx];
-      const socialData = facebookDataArray[idx];
-      const urlScore = this.evaluateSocialUrlCandidate(signals, url, meta.title, meta.description, 'Facebook');
-      logger.info(`[ProfileDiscoveryEngine] Facebook URL evaluated: ${url} → Score: ${urlScore}%`);
-      candidates.push({
-        fullName: socialData?.displayName || signals.name,
-        company: signals.company || undefined,
-        designation: signals.designation || undefined,
-        headline: socialData?.bio || undefined,
-        summary: socialData?.bio || undefined,
-        experience: [],
-        education: [],
-        skills: [],
-        projects: [],
-        publicProfiles: [{ platform: 'Facebook', url, confidence: urlScore, reasons: [
-          `Name match: ${meta.title}`,
-          `Search snippet: ${meta.description.substring(0, 80)}`
-        ] }],
-        source: 'Facebook Discovery',
-        sourceConfidence: urlScore,
-        verificationStatus: urlScore >= 70 ? 'Verified' : 'Unverified'
-      });
-    }
-
-    // Step 12: Add Twitter/X candidates
-    for (let idx = 0; idx < twitterUrlsList.length; idx++) {
-      const [url, meta] = twitterUrlsList[idx];
-      const socialData = twitterDataArray[idx];
-      const urlScore = this.evaluateSocialUrlCandidate(signals, url, meta.title, meta.description, 'Twitter/X');
-      logger.info(`[ProfileDiscoveryEngine] Twitter/X URL evaluated: ${url} → Score: ${urlScore}%`);
-      candidates.push({
-        fullName: socialData?.displayName || signals.name,
-        company: signals.company || undefined,
-        designation: signals.designation || undefined,
-        headline: socialData?.bio || undefined,
-        summary: socialData?.bio || undefined,
-        experience: [],
-        education: [],
-        skills: [],
-        projects: [],
-        publicProfiles: [{ platform: 'Twitter/X', url, confidence: urlScore, reasons: [
-          `Name match: ${meta.title}`,
-          `Search snippet: ${meta.description.substring(0, 80)}`
-        ] }],
-        source: 'Twitter/X Discovery',
-        sourceConfidence: urlScore,
-        verificationStatus: urlScore >= 70 ? 'Verified' : 'Unverified'
-      });
-    }
 
     return {
       candidates,
@@ -607,78 +522,7 @@ export class ProfileDiscoveryEngine {
     return Math.min(score, 100);
   }
 
-  /**
-   * Evaluate a social media URL candidate (Instagram, Facebook, Twitter/X).
-   * Uses the same weighted matching approach as evaluateLinkedInUrlCandidate.
-   */
-  private evaluateSocialUrlCandidate(signals: IdentitySignals, url: string, title: string, description: string, platform: string): number {
-    let score = 0;
-    const lowerTitle = title.toLowerCase();
-    const lowerDesc = description.toLowerCase();
 
-    // Extract username/slug from URL
-    let slug = '';
-    if (platform === 'Instagram') {
-      const match = url.match(/instagram\.com\/([^\/\?]+)/);
-      slug = match ? match[1].toLowerCase() : '';
-    } else if (platform === 'Facebook') {
-      const match = url.match(/facebook\.com\/([^\/\?]+)/);
-      slug = match ? match[1].toLowerCase() : '';
-    } else if (platform === 'Twitter/X') {
-      const match = url.match(/(?:twitter|x)\.com\/([^\/\?]+)/);
-      slug = match ? match[1].toLowerCase() : '';
-    }
-
-    // Name Match in title/description
-    const nameSim = stringSimilarity(signals.name.toLowerCase(), lowerTitle);
-    if (nameSim > 0.5) score += 35;
-    else if (nameSim > 0.3) score += 20;
-
-    // Name parts in slug (e.g. username = johnsmith matches "John Smith")
-    const nameParts = signals.name.toLowerCase().split(/\s+/);
-    const slugClean = slug.replace(/[._-]/g, '');
-    const slugMatchCount = nameParts.filter(part => slugClean.includes(part)).length;
-    if (slugMatchCount === nameParts.length) score += 15;
-    else if (slugMatchCount > 0) score += 8;
-
-    // Company Match
-    if (signals.company) {
-      const cleanCompany = signals.company.toLowerCase().replace(/inc|llc|corp|\s/g, '');
-      if (lowerTitle.includes(cleanCompany) || lowerDesc.includes(cleanCompany)) {
-        score += 25;
-      }
-    }
-
-    // Designation Match
-    if (signals.designation) {
-      const cleanDesig = signals.designation.toLowerCase();
-      if (lowerTitle.includes(cleanDesig) || lowerDesc.includes(cleanDesig)) {
-        score += 15;
-      }
-    }
-
-    // Domain Match
-    if (signals.companyDomain && (lowerTitle.includes(signals.companyDomain) || lowerDesc.includes(signals.companyDomain))) {
-      score += 10;
-    }
-
-    return Math.min(score, 100);
-  }
-
-  /**
-   * Attempt to scrape public social profile metadata using Cheerio.
-   * Only extracts Open Graph / meta tag data — no login bypass.
-   */
-  private async scrapeSocialProfile(url: string, platform: string): Promise<import('./CheerioParser').SocialProfilePublicData | null> {
-    try {
-      logger.info(`[ProfileDiscoveryEngine] Attempting public scrape of ${platform} profile: ${url}`);
-      const html = await this.cheerioParser.fetchHtml(url);
-      return this.cheerioParser.parseSocialProfilePublic(html, platform);
-    } catch (e: any) {
-      logger.warn(`[ProfileDiscoveryEngine] Public scrape failed for ${platform} ${url}: ${e.message} (profile may be private)`);
-      return null;
-    }
-  }
 
   private async fetchGitHubDetails(githubUrl: string): Promise<any | null> {
     const parts = githubUrl.replace(/\/$/, '').split('/');

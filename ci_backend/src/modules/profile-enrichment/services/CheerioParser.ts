@@ -7,6 +7,9 @@ export interface CompanyScrapedData {
   leadership?: Array<{ name: string; designation?: string; department?: string }>;
   offices?: string[];
   contactDetails?: { email?: string; phone?: string };
+  logo?: string;
+  industry?: string;
+  headquarters?: string;
 }
 
 export interface PortfolioScrapedData {
@@ -110,12 +113,24 @@ export class CheerioParser {
     const phoneMatch = text.match(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
     if (phoneMatch) phone = phoneMatch[0];
 
+    // Logo extraction
+    const logo = $('link[rel*="icon"]').last().attr('href') || $('meta[property="og:image"]').attr('content') || $('img[alt*="logo" i], img[class*="logo" i]').first().attr('src');
+    
+    // Industry extraction
+    const industry = $('meta[property="og:site_name"]').attr('content') || $('meta[name="industry"]').attr('content') || $('meta[name="keywords"]').attr('content')?.split(',')[0];
+
+    // Headquarters extraction
+    const headquarters = offices.length > 0 ? offices[0] : undefined;
+
     return {
       companyName,
       about: about.slice(0, 500),
       leadership: leadership.slice(0, 10),
       offices: offices.slice(0, 3),
       contactDetails: { email, phone },
+      logo,
+      industry,
+      headquarters
     };
   }
 

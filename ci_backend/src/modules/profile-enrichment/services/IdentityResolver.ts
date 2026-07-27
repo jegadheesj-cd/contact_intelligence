@@ -1,4 +1,5 @@
 import logger from '../../../config/logger';
+import { normalizeCompanyName } from '../../../utils/stringUtils';
 
 export interface IdentitySignals {
   name: string;
@@ -17,7 +18,7 @@ export class IdentityResolver {
     logger.info(`[IdentityResolver] Resolving identity signals for contact: ${contact.name}`);
 
     const name = contact.name || 'Unknown';
-    const company = contact.company || null;
+    const company = normalizeCompanyName(contact.company);
     const designation = contact.designation || null;
     const email = contact.email || null;
     const phone = contact.phone || null;

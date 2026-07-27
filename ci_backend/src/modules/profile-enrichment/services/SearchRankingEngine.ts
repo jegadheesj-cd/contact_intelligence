@@ -45,157 +45,216 @@ export class SearchRankingEngine {
       const candidate = candidates[i];
       let confidence = 0;
       const reasons: string[] = [];
+      const matchedSignals: string[] = [];
+      const missingSignals: string[] = [];
+      const penalties: string[] = [];
 
       const candidateStr = JSON.stringify(candidate).toLowerCase();
+      const platform = candidate.publicProfiles[0]?.platform || 'Unknown';
+      const url = candidate.publicProfiles[0]?.url || 'Unknown';
 
-      // --- Highest Weight (Up to 45%) ---
-      // 1. Exact Name Match
+      // --- POSITIVE SIGNALS ---
+      // 1. Full Name Similarity (+35)
       const nameSim = stringSimilarity(signals.name.toLowerCase(), candidate.fullName.toLowerCase());
-      const nameParts1 = signals.name.toLowerCase().split(/[\s,]+/);
-      const nameParts2 = candidate.fullName.toLowerCase().split(/[\s,]+/);
-      const firstName1 = nameParts1.find(w => w.length >= 3);
-      const firstName2 = nameParts2.find(w => w.length >= 3);
-      
-      let firstNamesMatch = false;
-      if (firstName1 && firstName2) {
-          firstNamesMatch = stringSimilarity(firstName1, firstName2) > 0.8;
-      }
-
-      if (nameSim > 0.85) {
+      let hasNameMatch = false;
+      if (nameSim > 0.8) {
         confidence += 35;
-        reasons.push('Name Similarity: +35');
-      } else if (nameSim > 0.6) {
-        confidence += 25;
-        reasons.push('Name Similarity: +25');
-      } else if (firstNamesMatch || nameSim > 0.4) {
+        hasNameMatch = true;
+        matchedSignals.push('Full Name');
+        reasons.push('Full Name Similarity: +35');
+      } else if (nameSim > 0.5) {
         confidence += 15;
-        reasons.push('Name Similarity: +15');
+        matchedSignals.push('Partial Name');
+        reasons.push('Partial Name Similarity: +15');
       } else {
-        reasons.push('Name Similarity: +0');
+        missingSignals.push('Full Name not matched');
       }
 
-      // 2. Email Match
-      let hasEmailMatch = false;
-      if (signals.email && candidateStr.includes(signals.email.toLowerCase())) {
-        confidence += 20;
-        hasEmailMatch = true;
-        reasons.push('Email Match: +20');
-      }
-
-      // 3. Phone Match
-      if (signals.phone && candidateStr.includes(signals.phone.replace(/[^0-9]/g, ''))) {
-        confidence += 10;
-        reasons.push('Phone Match: +10');
-      }
-
-      // 4. Email Domain Match
-      if (ocrDomain && !hasEmailMatch) {
-        if ((candidate.company && candidate.company.toLowerCase().includes(ocrDomain.split('.')[0])) ||
-            candidate.publicProfiles.some(p => p.url.toLowerCase().includes(ocrDomain))) {
-          confidence += 5;
-          reasons.push('Domain Match: +5');
-        }
-      }
-
-      // --- High Weight ---
-      // 5. Company Match
+      // 2. Company Match (+25)
+      let hasCompanyMatch = false;
       if (signals.company) {
         let bestCompSim = 0;
         if (candidate.company) bestCompSim = stringSimilarity(signals.company.toLowerCase(), candidate.company.toLowerCase());
-        const signalCompany = signals.company;
         candidate.experience.forEach(exp => {
-          if (exp.company) bestCompSim = Math.max(bestCompSim, stringSimilarity(signalCompany.toLowerCase(), exp.company.toLowerCase()));
+          if (exp.company) bestCompSim = Math.max(bestCompSim, stringSimilarity(signals.company!.toLowerCase(), exp.company.toLowerCase()));
         });
-        if (bestCompSim > 0.8) {
-          confidence += 20;
-          reasons.push('Company Match: +20');
-        } else if (bestCompSim > 0.5) {
+        if (bestCompSim > 0.7) {
+          confidence += 25;
+          hasCompanyMatch = true;
+          matchedSignals.push('Company');
+          reasons.push('Company Match: +25');
+        } else if (bestCompSim > 0.4) {
           confidence += 10;
-          reasons.push('Company Match: +10');
+          matchedSignals.push('Partial Company');
+          reasons.push('Partial Company Match: +10');
+        } else {
+          missingSignals.push('Company mismatch');
         }
       }
 
-      // 6. Company Website Match
-      if (ocrWebDomain) {
-        if (candidate.publicProfiles.some(p => getWebsiteDomain(p.url) === ocrWebDomain) || candidate.companyBio) {
-          confidence += 5;
-          reasons.push('Website Match: +5');
-        }
-      }
-
-      // --- Medium Weight ---
-      // 7. Username Similarity
-      if (signals.email) {
-        const emailPrefix = signals.email.split('@')[0].toLowerCase();
-        const usernames = candidate.publicProfiles.map(p => {
-          const match = p.url.match(/([^\/]+)\/?$/);
-          return match ? match[1].split('?')[0].toLowerCase() : '';
-        }).filter(Boolean);
-        if (usernames.some(u => u.includes(emailPrefix) || emailPrefix.includes(u))) {
-          confidence += 10;
-          reasons.push('Username Match: +10');
-        }
-      }
-
-      // 8. Website Match (Generic / Portfolio)
-      if (candidate.source === 'Portfolio Scraper') {
-        confidence += 5;
-        reasons.push('Portfolio Match: +5');
-      }
-
-      // 9. Location Match
-      if (signals.address && candidate.location) {
-        if (stringSimilarity(signals.address.toLowerCase(), candidate.location.toLowerCase()) > 0.5) {
-          confidence += 5;
-          reasons.push('Location Match: +5');
-        }
-      }
-
-      // 10. Cross Platform References
-      if (candidate.publicProfiles.length > 1) {
-        confidence += 5;
-        reasons.push('Cross-platform references: +5');
-      }
-
-      // --- Low Weight ---
-      // 11. Designation Similarity
+      // 3. Designation Match (+15)
       if (signals.designation) {
         let bestDesigSim = 0;
         if (candidate.designation) bestDesigSim = Math.max(bestDesigSim, stringSimilarity(signals.designation.toLowerCase(), candidate.designation.toLowerCase()));
         if (candidate.headline) bestDesigSim = Math.max(bestDesigSim, stringSimilarity(signals.designation.toLowerCase(), candidate.headline.toLowerCase()));
         if (bestDesigSim > 0.6) {
-          confidence += 10;
-          reasons.push('Designation Match: +10');
+          confidence += 15;
+          matchedSignals.push('Designation');
+          reasons.push('Designation Match: +15');
+        } else {
+          missingSignals.push('Designation not matched');
         }
       }
 
-      // Never assign identical confidence values.
-      // We add a tiny tie-breaker based on the index to ensure uniqueness if ties occur.
-      const tieBreaker = (candidates.length - i) * 0.0001; 
-      
-      // Source Match (represent Google/Tavily search signals)
-      const originalConfidence = candidate.sourceConfidence || 0;
-      if (originalConfidence > 50) {
-        const bonus = Math.min(30, Math.floor(originalConfidence * 0.4));
-        confidence += bonus;
-        reasons.push(`Source Match: +${bonus}`);
+      // 4. Username Similarity (+10)
+      if (signals.email) {
+        const emailPrefix = signals.email.split('@')[0].toLowerCase();
+        if (url.toLowerCase().includes(emailPrefix)) {
+          confidence += 10;
+          matchedSignals.push('Username');
+          reasons.push('Username Similarity: +10');
+        } else {
+          missingSignals.push('Email/Username not found in URL');
+        }
+      }
+
+      // 5. Company Website Match (+10)
+      if (ocrWebDomain) {
+        if (url.toLowerCase().includes(ocrWebDomain)) {
+          confidence += 10;
+          matchedSignals.push('Website Domain');
+          reasons.push('Company Website Match: +10');
+        } else {
+          missingSignals.push('Website Domain not matched');
+        }
+      }
+
+      // 6. Email Domain (+5)
+      if (ocrDomain && candidateStr.includes(ocrDomain)) {
+        confidence += 5;
+        matchedSignals.push('Email Domain');
+        reasons.push('Email Domain Match: +5');
+      }
+
+      // 7. Cross Platform References (+5)
+      if (candidate.publicProfiles.length > 1) {
+        confidence += 5;
+        matchedSignals.push('Cross-platform Reference');
+        reasons.push('Cross Platform References: +5');
+      }
+
+      // 8. Official Employee Page (+10)
+      if (platform === 'Company Website' && (url.includes('/team') || url.includes('/about') || url.includes('/leadership') || candidate.companyRole)) {
+        confidence += 10;
+        matchedSignals.push('Employee Page');
+        reasons.push('Official Employee Page: +10');
+      }
+
+      // 9. Portfolio Ownership (+10)
+      if (platform === 'Portfolio' || candidate.source === 'Portfolio Scraper') {
+        confidence += 10;
+        matchedSignals.push('Portfolio');
+        reasons.push('Portfolio Ownership: +10');
+      }
+
+      // 10. Professional Bio Similarity (+5)
+      if (candidate.summary && candidate.summary.length > 50) {
+        confidence += 5;
+        matchedSignals.push('Professional Bio');
+        reasons.push('Professional Bio Similarity: +5');
+      }
+
+      // --- NEGATIVE SIGNALS ---
+      // 1. Wrong Person (-50)
+      if (!hasNameMatch && nameSim < 0.3 && platform !== 'Company Website') {
+        confidence -= 50;
+        penalties.push('Wrong Person (-50)');
+        reasons.push('Wrong Person: -50');
+      }
+
+      // 2. Wrong Company (-40)
+      if (signals.company && !hasCompanyMatch && candidate.company) {
+        // If candidate clearly belongs to another company, penalize
+        confidence -= 40;
+        penalties.push('Wrong Company (-40)');
+        reasons.push('Wrong Company: -40');
+      }
+
+      // 3. Organization Homepage (-30)
+      // (No longer applied to Company Website as it is intended to be the homepage)
+      if (platform !== 'Company Website' && (url.endsWith('/') || url.split('/').length <= 3)) {
+        confidence -= 30;
+        penalties.push('Organization Homepage (-30)');
+        reasons.push('Organization Homepage: -30');
+      }
+
+      // 4. Generic Company Page (-30)
+      // (No longer applied to Company Website as it is intended to be the homepage)
+      if (platform !== 'Company Website' && url.includes('/contact') && !hasNameMatch) {
+        confidence -= 30;
+        penalties.push('Generic Company Page (-30)');
+        reasons.push('Generic Company Page: -30');
+      }
+
+      // 5. Directory Page (-20)
+      if (url.includes('/directory') || url.includes('/list') || url.includes('zoominfo.com')) {
+        confidence -= 20;
+        penalties.push('Directory Page (-20)');
+        reasons.push('Directory Page: -20');
+      }
+
+      // 6. Missing Identity Signals (-10)
+      if (!candidate.company && !candidate.designation && !candidate.summary) {
+        confidence -= 10;
+        penalties.push('Missing Identity Signals (-10)');
+        reasons.push('Missing Identity Signals: -10');
+      }
+
+      // Boost for official Company Website
+      if (platform === 'Company Website' && hasCompanyMatch) {
+        confidence += 60;
+        reasons.push('Official Company Website Boost: +60');
       }
 
       // Cap at 99.9% max and at least 1% for any discovered profile
       confidence = Math.max(1, Math.min(confidence, 99.9));
 
+      // Tie breaker
+      const tieBreaker = (candidates.length - i) * 0.0001; 
       confidence = confidence + tieBreaker;
+      
+      const finalConfidence = Number(confidence.toFixed(4));
+      candidate.sourceConfidence = finalConfidence;
 
-      // Update candidate confidence
-      candidate.sourceConfidence = Number(confidence.toFixed(4));
-      candidate.verificationStatus = candidate.sourceConfidence >= 70 ? 'Verified' : 'Unverified';
+      // Verification Status logic
+      if (hasNameMatch && hasCompanyMatch && finalConfidence >= 90) {
+        candidate.verificationStatus = 'VERIFIED';
+      } else {
+        candidate.verificationStatus = `Likely Match ${Math.floor(finalConfidence)}%`;
+      }
+
       (candidate as any).verificationReasons = reasons;
 
-      // Update nested public profiles confidence
       if (candidate.publicProfiles.length > 0) {
-        candidate.publicProfiles[0].confidence = candidate.sourceConfidence;
+        candidate.publicProfiles[0].confidence = finalConfidence;
         candidate.publicProfiles[0].reasons = reasons;
       }
+
+      candidate.explainability = {
+        confidence: Math.floor(finalConfidence),
+        matchedSignals,
+        missingSignals,
+        penalties,
+        verification: candidate.verificationStatus
+      };
+
+      // Runtime Debugging Log
+      logger.info(`--- CANDIDATE EVALUATION ---`);
+      logger.info(`Platform: ${platform}`);
+      logger.info(`URL: ${url}`);
+      logger.info(`Name: ${candidate.fullName}`);
+      logger.info(`Explainability: ${JSON.stringify(candidate.explainability)}`);
+      logger.info(`----------------------------`);
     }
 
     // Sort candidates descending by confidence

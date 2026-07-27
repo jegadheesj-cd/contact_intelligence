@@ -66,6 +66,9 @@ export const ContactDetailPage: React.FC = () => {
 
   // Selected candidate profile detail drawer state
   const [selectedCandidate, setSelectedCandidate] = useState<any | null>(null);
+  
+  // Expanded platforms state for View X More toggle
+  const [expandedPlatforms, setExpandedPlatforms] = useState<Record<string, boolean>>({});
 
   // Inline editing state for contact detail fields
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -924,13 +927,18 @@ export const ContactDetailPage: React.FC = () => {
                 </p>
               </div>
             ) : (
-              Object.entries(groupedCandidates).map(([platform, responses]) => (
+              Object.entries(groupedCandidates).map(([platform, responses]) => {
+                const isExpanded = expandedPlatforms[platform] || false;
+                const visibleResponses = isExpanded ? responses : responses.slice(0, 1);
+                const hiddenCount = responses.length - 1;
+
+                return (
                 <div key={platform} className="space-y-3">
                   <h3 className="text-xs font-extrabold text-slate-700 uppercase tracking-widest border-b border-slate-50 pb-1.5 flex items-center gap-2">
                     <span>•</span> {platform} Profiles ({responses.length})
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {responses.map((resp: any, idx: number) => {
+                    {visibleResponses.map((resp: any, idx: number) => {
                       const cand = resp.data;
                       const isBest = idx === 0 && resp.confidence >= 70;
                       const profileUrl = cand.publicProfiles?.find((p: any) => p.platform.toLowerCase() === platform.toLowerCase() || p.platform === platform)?.url || cand.publicProfiles?.[0]?.url;
@@ -942,9 +950,11 @@ export const ContactDetailPage: React.FC = () => {
                           <div>
                             <div className="flex justify-between items-start gap-2 mb-2">
                               <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide border select-none
-                                ${cand.verificationStatus === 'Verified' || resp.confidence >= 70
+                                ${cand.verificationStatus === 'VERIFIED' || cand.verificationStatus === 'Verified'
                                   ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                  : 'bg-slate-50 text-slate-500 border-slate-200'}`}
+                                  : cand.verificationStatus?.startsWith('Likely Match')
+                                    ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                    : 'bg-slate-50 text-slate-500 border-slate-200'}`}
                               >
                                 {cand.verificationStatus || 'Unverified'}
                               </span>
@@ -979,6 +989,68 @@ export const ContactDetailPage: React.FC = () => {
                                 Organization: {cand.company}
                               </p>
                             )}
+                            {cand.location && (
+                              <p className="text-[10px] text-slate-400 font-medium mt-1">
+                                <MapPin className="h-2.5 w-2.5 inline mr-1" /> {cand.location}
+                              </p>
+                            )}
+
+                            {cand.explainability && (
+                              <div className="mt-4 space-y-2.5 border-t border-slate-100/60 pt-3">
+                                {cand.explainability.matchedSignals?.length > 0 && (
+                                  <div>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                                      <Check className="h-2.5 w-2.5 text-emerald-500" /> Matched Signals
+                                    </p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {cand.explainability.matchedSignals.map((sig: string, i: number) => (
+                                        <span key={i} className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100 font-bold">
+                                          {sig}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {cand.explainability.missingSignals?.length > 0 && (
+                                  <div>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 mt-2.5 flex items-center gap-1">
+                                      <AlertTriangle className="h-2.5 w-2.5 text-amber-500" /> Missing Signals
+                                    </p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {cand.explainability.missingSignals.map((sig: string, i: number) => (
+                                        <span key={i} className="text-[9px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-100 font-bold">
+                                          {sig}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {cand.explainability.penalties?.length > 0 && (
+                                  <div>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 mt-2.5 flex items-center gap-1">
+                                      <X className="h-2.5 w-2.5 text-rose-500" /> Penalties Applied
+                                    </p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {cand.explainability.penalties.map((sig: string, i: number) => (
+                                        <span key={i} className="text-[9px] bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded border border-rose-100 font-bold">
+                                          {sig}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {cand.summary && (
+                              <div className="mt-3 bg-slate-50 p-2 rounded-lg border border-slate-100/50">
+                                <p className="text-[10px] text-slate-600 line-clamp-3 leading-relaxed font-medium">
+                                  {cand.summary}
+                                </p>
+                              </div>
+                            )}
                           </div>
 
                           <div className="mt-4 pt-3 border-t border-slate-100/60 flex items-center justify-between">
@@ -1001,8 +1073,24 @@ export const ContactDetailPage: React.FC = () => {
                       );
                     })}
                   </div>
+                  
+                  {hiddenCount > 0 && (
+                    <div className="flex justify-center mt-3">
+                      <button
+                        onClick={() => setExpandedPlatforms(prev => ({ ...prev, [platform]: !isExpanded }))}
+                        className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-4 py-1.5 rounded-full transition-colors flex items-center gap-1"
+                      >
+                        {isExpanded ? (
+                          <>Show Less <ChevronUp className="h-3 w-3" /></>
+                        ) : (
+                          <>View {hiddenCount} More Possible Matches <ChevronDown className="h-3 w-3" /></>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         )}
@@ -1235,6 +1323,65 @@ export const ContactDetailPage: React.FC = () => {
             {/* Drawer Scrollable Body Content */}
             <div className="flex-1 overflow-y-auto p-5 space-y-6">
               
+              {/* Explainability Section */}
+              {selectedCandidate.explainability && (
+                <div className="space-y-3 bg-indigo-50/50 p-4 border border-indigo-100 rounded-xl">
+                  <h4 className="text-[10px] font-bold text-indigo-800 uppercase tracking-widest flex items-center gap-1.5">
+                    <Cpu className="h-3.5 w-3.5" /> Why this profile was selected
+                  </h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Positive Signals */}
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-bold text-emerald-800 flex items-center gap-1 mb-2">
+                        <Check className="h-3 w-3 text-emerald-600" /> Matched Signals
+                      </p>
+                      <ul className="space-y-1">
+                        {selectedCandidate.explainability.matchedSignals?.map((sig: string, i: number) => (
+                          <li key={i} className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded">
+                            {sig}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Missing Signals */}
+                      {selectedCandidate.explainability.missingSignals?.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-bold text-amber-800 flex items-center gap-1 mb-2">
+                            <AlertTriangle className="h-3 w-3 text-amber-600" /> Missing Signals
+                          </p>
+                          <ul className="space-y-1">
+                            {selectedCandidate.explainability.missingSignals.map((sig: string, i: number) => (
+                              <li key={i} className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 px-2 py-1 rounded">
+                                {sig}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Penalties */}
+                      {selectedCandidate.explainability.penalties?.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-bold text-rose-800 flex items-center gap-1 mb-2">
+                            <X className="h-3 w-3 text-rose-600" /> Penalties
+                          </p>
+                          <ul className="space-y-1">
+                            {selectedCandidate.explainability.penalties.map((sig: string, i: number) => (
+                              <li key={i} className="text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-100 px-2 py-1 rounded">
+                                {sig}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* About candidate biography */}
               {(selectedCandidate.summary || selectedCandidate.companyBio) && (
                 <div className="space-y-2">
