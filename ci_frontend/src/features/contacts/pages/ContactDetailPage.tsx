@@ -41,6 +41,37 @@ import {
   FolderGit2,
 } from 'lucide-react';
 
+interface CountUpProps {
+  end: number;
+  decimals?: number;
+  suffix?: string;
+  duration?: number;
+}
+
+const CountUp: React.FC<CountUpProps> = ({ end, decimals = 0, suffix = '', duration = 750 }) => {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    let startTimestamp: number | null = null;
+    let animationFrameId: number;
+    const step = (timestamp: number) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      const current = progress * end;
+      setCount(current);
+      if (progress < 1) {
+        animationFrameId = window.requestAnimationFrame(step);
+      } else {
+        setCount(end);
+      }
+    };
+    animationFrameId = window.requestAnimationFrame(step);
+    return () => window.cancelAnimationFrame(animationFrameId);
+  }, [end, duration]);
+
+  return <span>{count.toFixed(decimals)}{suffix}</span>;
+};
+
 export const ContactDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -495,7 +526,7 @@ export const ContactDetailPage: React.FC = () => {
         
         {/* OVERVIEW TAB */}
         {activeTab === 'overview' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-slide-down">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in animate-slide-up">
             
             {/* Left Column: Basic editable info card */}
             <div className="lg:col-span-7 bg-white p-5 border border-slate-100 rounded-xl shadow-xs flex flex-col gap-4">
@@ -568,7 +599,7 @@ export const ContactDetailPage: React.FC = () => {
 
         {/* CAREER & EDUCATION TAB */}
         {activeTab === 'career' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-slide-down">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in animate-slide-up">
             
             {/* Left Column: Timelines */}
             <div className="lg:col-span-8 flex flex-col gap-6">
@@ -581,7 +612,7 @@ export const ContactDetailPage: React.FC = () => {
                 {aiProfile?.experience && aiProfile.experience.length > 0 ? (
                   <div className="relative border-l-2 border-slate-100 pl-5 ml-2.5 space-y-6 py-2">
                     {aiProfile.experience.map((exp: any, idx: number) => (
-                      <div key={idx} className="relative flex flex-col gap-1">
+                      <div key={idx} className="relative flex flex-col gap-1 animate-slide-up opacity-0" style={{ animationDelay: `${idx * 40}ms`, animationFillMode: 'forwards' }}>
                         <span className="absolute -left-[26px] top-1.5 h-3.5 w-3.5 rounded-full bg-indigo-500 border-2 border-white shadow-sm" />
                         <h3 className="text-xs font-bold text-slate-900 leading-tight">{exp.title}</h3>
                         <div className="flex items-center text-[10px] text-slate-555 font-bold">
@@ -609,7 +640,7 @@ export const ContactDetailPage: React.FC = () => {
                 {aiProfile?.education && aiProfile.education.length > 0 ? (
                   <div className="relative border-l-2 border-slate-100 pl-5 ml-2.5 space-y-6 py-2">
                     {aiProfile.education.map((edu: any, idx: number) => (
-                      <div key={idx} className="relative flex flex-col gap-1">
+                      <div key={idx} className="relative flex flex-col gap-1 animate-slide-up opacity-0" style={{ animationDelay: `${idx * 40}ms`, animationFillMode: 'forwards' }}>
                         <span className="absolute -left-[26px] top-1.5 h-3.5 w-3.5 rounded-full bg-purple-550 border-2 border-white shadow-sm" />
                         <h3 className="text-xs font-bold text-slate-900 leading-tight">{edu.degree}</h3>
                         <div className="flex items-center text-[10px] text-slate-555 font-bold">
@@ -646,7 +677,7 @@ export const ContactDetailPage: React.FC = () => {
                   {collapsibles.certifications ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
                 </button>
                 {collapsibles.certifications && (
-                  <div className="p-4 border-t border-slate-50">
+                  <div className="p-4 border-t border-slate-50 animate-fade-in animate-slide-up">
                     {aiProfile?.certifications && aiProfile.certifications.length > 0 ? (
                       <ul className="list-disc list-inside text-xs font-semibold text-slate-600 space-y-1.5">
                         {aiProfile.certifications.map((c: string, idx: number) => <li key={idx}>{c}</li>)}
@@ -668,7 +699,7 @@ export const ContactDetailPage: React.FC = () => {
                   {collapsibles.achievements ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
                 </button>
                 {collapsibles.achievements && (
-                  <div className="p-4 border-t border-slate-50">
+                  <div className="p-4 border-t border-slate-50 animate-fade-in animate-slide-up">
                     {aiProfile?.achievements && aiProfile.achievements.length > 0 ? (
                       <ul className="list-disc list-inside text-xs font-semibold text-slate-600 space-y-1.5">
                         {aiProfile.achievements.map((a: string, idx: number) => <li key={idx}>{a}</li>)}
@@ -690,7 +721,7 @@ export const ContactDetailPage: React.FC = () => {
                   {collapsibles.languages ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
                 </button>
                 {collapsibles.languages && (
-                  <div className="p-4 border-t border-slate-50">
+                  <div className="p-4 border-t border-slate-50 animate-fade-in animate-slide-up">
                     {aiProfile?.languages && aiProfile.languages.length > 0 ? (
                       <div className="flex flex-wrap gap-1.5">
                         {aiProfile.languages.map((l: string) => (
@@ -716,7 +747,7 @@ export const ContactDetailPage: React.FC = () => {
                   {collapsibles.interests ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
                 </button>
                 {collapsibles.interests && (
-                  <div className="p-4 border-t border-slate-50">
+                  <div className="p-4 border-t border-slate-50 animate-fade-in animate-slide-up">
                     {aiProfile?.interests && aiProfile.interests.length > 0 ? (
                       <div className="flex flex-wrap gap-1.5">
                         {aiProfile.interests.map((i: string) => (
@@ -737,7 +768,7 @@ export const ContactDetailPage: React.FC = () => {
 
         {/* AI INTELLIGENCE TAB */}
         {activeTab === 'ai' && (
-          <div className="flex flex-col gap-6 animate-slide-down text-slate-800">
+          <div className="flex flex-col gap-6 animate-fade-in animate-slide-up text-slate-800">
             {!aiProfile && !aiParsedSummary && !isPipelineActive ? (
               <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-slate-100 rounded-xl bg-white">
                 <div className="p-4 bg-purple-50 rounded-full mb-3 text-purple-500 animate-pulse">
@@ -749,14 +780,49 @@ export const ContactDetailPage: React.FC = () => {
                 </p>
               </div>
             ) : isPipelineActive ? (
-              <div className="flex flex-col items-center justify-center p-12 text-center border border-slate-100 rounded-xl bg-white">
-                <div className="p-4 bg-indigo-50 text-indigo-550 rounded-full mb-3 animate-spin">
-                  <Loader2 className="h-8 w-8" />
+              <div className="flex flex-col items-center justify-center p-12 text-center border border-slate-100/80 rounded-xl bg-white animate-fade-in shadow-xs">
+                <div className="p-4 bg-indigo-50/50 text-indigo-650 rounded-full mb-4 animate-pulse border border-indigo-100">
+                  <Loader2 className="h-8 w-8 animate-spin" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-850 uppercase tracking-widest">{enrichmentStatus.replace('_', ' ')}</h3>
-                <p className="text-xs text-slate-450 mt-1 max-w-sm">
-                  The OSINT public search & AI summary engine is active. Please hold...
+                <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-widest mb-1">
+                  AI Enrichment Pipeline Active
+                </h3>
+                <p className="text-xs text-slate-450 max-w-sm mb-6 font-semibold">
+                  Currently running public directory searches, OSINT parsing, and summary synthesis.
                 </p>
+                
+                {/* Pipeline visualizer steps */}
+                <div className="w-full max-w-xs space-y-3.5 text-left border-t border-slate-50 pt-5">
+                  {[
+                    { label: 'Queueing Pipeline', active: ['QUEUED'].includes(enrichmentStatus), done: ['PROCESSING', 'FETCHING_PROFILE', 'VERIFYING', 'GENERATING_SUMMARY', 'COMPLETED'].includes(enrichmentStatus) },
+                    { label: 'OSINT Search & Profile Discovery', active: ['PROCESSING', 'FETCHING_PROFILE'].includes(enrichmentStatus), done: ['VERIFYING', 'GENERATING_SUMMARY', 'COMPLETED'].includes(enrichmentStatus) },
+                    { label: 'Identity Verification Alignment', active: ['VERIFYING'].includes(enrichmentStatus), done: ['GENERATING_SUMMARY', 'COMPLETED'].includes(enrichmentStatus) },
+                    { label: 'AI Grounded Summary Synthesis', active: ['GENERATING_SUMMARY'].includes(enrichmentStatus), done: ['COMPLETED'].includes(enrichmentStatus) }
+                  ].map((step, idx) => (
+                    <div key={idx} className="flex items-center gap-3">
+                      <div className={`h-4 w-4 rounded-full flex items-center justify-center border text-[9px] font-black
+                        ${step.done 
+                          ? 'bg-emerald-500 border-emerald-500 text-white shadow-xs shadow-emerald-500/20' 
+                          : step.active 
+                            ? 'bg-indigo-600 border-indigo-600 text-white animate-pulse shadow-xs shadow-indigo-600/20' 
+                            : 'bg-slate-50 border-slate-200 text-slate-400'
+                        }`}
+                      >
+                        {step.done ? '✓' : idx + 1}
+                      </div>
+                      <span className={`text-[11px] font-bold transition-all duration-200
+                        ${step.done 
+                          ? 'text-slate-500 line-through' 
+                          : step.active 
+                            ? 'text-indigo-650 font-black' 
+                            : 'text-slate-400'
+                        }`}
+                      >
+                        {step.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : (
               <>
@@ -775,14 +841,14 @@ export const ContactDetailPage: React.FC = () => {
                       <div className="relative h-20 w-20 flex items-center justify-center mt-3">
                         <svg className="absolute transform -rotate-90 w-full h-full" viewBox="0 0 36 36">
                           <circle cx="18" cy="18" r="16" strokeWidth="2.5" stroke="#f1f5f9" fill="transparent" />
-                          <circle cx="18" cy="18" r="16" strokeWidth="2.5" 
+                          <circle cx="18" cy="18" r="16" strokeWidth="2.5" className="transition-all duration-1000 ease-out"
                             stroke={verificationStatus && verificationStatus.includes('Failed') ? '#f59e0b' : '#10b981'} 
                             fill="transparent" 
                             strokeDasharray={2 * Math.PI * 16}
                             strokeDashoffset={2 * Math.PI * 16 * (1 - verificationConfidence / 100)} 
                           />
                         </svg>
-                        <span className="text-base font-black text-slate-900">{verificationConfidence.toFixed(0)}%</span>
+                        <span className="text-base font-black text-slate-900"><CountUp end={verificationConfidence} suffix="%" /></span>
                       </div>
                     )}
                     <p className="text-[10px] text-slate-400 mt-2">Evaluation based on name, website, and title alignment checks.</p>
@@ -799,14 +865,14 @@ export const ContactDetailPage: React.FC = () => {
                     <div className="relative h-20 w-20 flex items-center justify-center mt-3">
                       <svg className="absolute transform -rotate-90 w-full h-full" viewBox="0 0 36 36">
                         <circle cx="18" cy="18" r="16" strokeWidth="2.5" stroke="#f1f5f9" fill="transparent" />
-                        <circle cx="18" cy="18" r="16" strokeWidth="2.5" strokeLinecap="round"
+                        <circle cx="18" cy="18" r="16" strokeWidth="2.5" strokeLinecap="round" className="transition-all duration-1000 ease-out"
                           stroke={scoreGaugeColor.replace('stroke-', '#')} 
                           fill="transparent" 
                           strokeDasharray={2 * Math.PI * 16}
                           strokeDashoffset={2 * Math.PI * 16 * (1 - score / 100)} 
                         />
                       </svg>
-                      <span className="text-lg font-black text-slate-900">{score}</span>
+                      <span className="text-lg font-black text-slate-900"><CountUp end={score} /></span>
                     </div>
                     <p className="text-[10px] text-slate-400 mt-2">Target authority score derived from organizational role.</p>
                   </div>
@@ -901,7 +967,7 @@ export const ContactDetailPage: React.FC = () => {
 
         {/* PROFILE DISCOVERY TAB */}
         {activeTab === 'discovery' && (
-          <div className="space-y-6 animate-slide-down">
+          <div className="space-y-6 animate-fade-in animate-slide-up">
             {enrichmentStatus === 'FAILED' ? (
               <div className="bg-rose-50 p-12 border border-rose-100 rounded-xl text-center flex flex-col items-center">
                 <div className="p-3 bg-white text-rose-500 rounded-full mb-3 shadow-sm border border-rose-100">
@@ -1107,7 +1173,7 @@ export const ContactDetailPage: React.FC = () => {
 
         {/* ACTIVITY & NOTES TAB */}
         {activeTab === 'activity' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-slide-down">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in animate-slide-up">
             
             {/* Left Column: Notes & Timeline */}
             <div className="lg:col-span-7 flex flex-col gap-6">

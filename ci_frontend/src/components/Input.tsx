@@ -11,7 +11,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="w-full flex flex-col gap-1.5 mb-4">
         {label && (
-          <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+          <label className="text-xs font-bold text-slate-600 dark:text-zinc-450 tracking-wide uppercase">
             {label}
           </label>
         )}
@@ -19,10 +19,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           <input
             type={type}
             ref={ref}
-            className={`w-full px-3.5 py-2 text-sm bg-white border rounded-lg outline-none transition-all duration-150 focus:ring-2 focus:bg-slate-50/20
+            className={`w-full px-3.5 py-2 text-sm bg-white dark:bg-zinc-950 text-slate-800 dark:text-zinc-200 border rounded-lg outline-none transition-all duration-150 focus:ring-2
               ${error 
-                ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-100' 
-                : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-100'
+                ? 'border-rose-450 focus:border-rose-500 focus:ring-rose-100 dark:focus:ring-rose-950/30' 
+                : 'border-slate-200 dark:border-zinc-800 focus:border-indigo-500 dark:focus:border-indigo-500 focus:ring-indigo-100 dark:focus:ring-indigo-950/40'
               } ${className}`}
             {...props}
           />
@@ -32,7 +32,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             {error}
           </p>
         ) : helperText ? (
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-400 dark:text-zinc-500 mt-0.5">
             {helperText}
           </p>
         ) : null}

@@ -188,8 +188,45 @@ export const ContactsListPage: React.FC = () => {
 
       {/* Main List canvas */}
       {isLoading ? (
-        <div className="bg-white border border-slate-100 rounded-xl p-12 flex justify-center shadow-xs">
-          <Loader message="Fetching contact directories..." size="md" />
+        <div className="bg-white border border-slate-100 rounded-xl shadow-xs overflow-hidden flex flex-col animate-fade-in">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-xs">
+              <thead className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50 border-b border-slate-100">
+                <tr>
+                  <th className="py-4 px-6">Profile Card</th>
+                  <th className="py-4 px-6 hidden sm:table-cell">Source</th>
+                  <th className="py-4 px-6">DM Score</th>
+                  <th className="py-4 px-6 hidden md:table-cell">Enrichment</th>
+                  <th className="py-4 px-6 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {[...Array(6)].map((_, i) => (
+                  <tr key={i}>
+                    <td className="py-4 px-6 flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-slate-100 animate-pulse shrink-0" />
+                      <div className="space-y-2 flex-1">
+                        <div className="h-3.5 w-32 bg-slate-200 rounded animate-pulse" />
+                        <div className="h-3 w-48 bg-slate-100 rounded animate-pulse" />
+                      </div>
+                    </td>
+                    <td className="py-4 px-6 hidden sm:table-cell">
+                      <div className="h-5 w-16 bg-slate-100 rounded animate-pulse" />
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="h-5 w-20 bg-slate-100 rounded-full animate-pulse" />
+                    </td>
+                    <td className="py-4 px-6 hidden md:table-cell">
+                      <div className="h-4 w-16 bg-slate-100 rounded animate-pulse" />
+                    </td>
+                    <td className="py-4 px-6 text-right">
+                      <div className="h-8 w-16 bg-slate-100 rounded-lg animate-pulse ml-auto" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : isError ? (
         <div className="bg-white border border-slate-100 rounded-xl p-12 flex flex-col items-center justify-center text-center shadow-xs">
@@ -201,7 +238,7 @@ export const ContactsListPage: React.FC = () => {
           </Button>
         </div>
       ) : data?.contacts && data.contacts.length > 0 ? (
-        <div className="bg-white border border-slate-100 rounded-xl shadow-xs overflow-hidden flex flex-col">
+        <div className="bg-white border border-slate-100 rounded-xl shadow-xs overflow-hidden flex flex-col animate-fade-in">
           {/* Table */}
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-xs text-slate-500">
@@ -215,7 +252,7 @@ export const ContactsListPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-semibold text-slate-800">
-                {data.contacts.map((contact) => {
+                {data.contacts.map((contact, idx) => {
                   const initials = contact.name
                     .split(/\s+/)
                     .map((n) => n[0])
@@ -236,12 +273,13 @@ export const ContactsListPage: React.FC = () => {
                   return (
                     <tr
                       key={contact.id}
-                      className="hover:bg-slate-50/30 transition-colors cursor-pointer"
+                      className="hover:bg-slate-50/30 transition-all duration-200 cursor-pointer animate-slide-up opacity-0"
+                      style={{ animationDelay: `${idx * 40}ms`, animationFillMode: 'forwards' }}
                       onClick={() => navigate(`/contacts/${contact.id}`)}
                     >
                       {/* Name/Avatar block */}
                       <td className="py-4 px-6 flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs tracking-wide shrink-0">
+                        <div className="h-10 w-10 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-650 flex items-center justify-center font-bold text-xs tracking-wide shrink-0 transition-transform duration-200 group-hover:scale-105">
                           {initials || <User className="h-4 w-4" />}
                         </div>
                         <div className="overflow-hidden">

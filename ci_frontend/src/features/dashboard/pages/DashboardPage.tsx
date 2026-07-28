@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDashboardWidgets, useDashboardAnalytics } from '../../../hooks/useDashboard';
 import { Loader } from '../../../components/Loader';
@@ -17,6 +17,37 @@ import {
   Clock,
   TrendingUp,
 } from 'lucide-react';
+
+interface CountUpProps {
+  end: number;
+  decimals?: number;
+  suffix?: string;
+  duration?: number;
+}
+
+const CountUp: React.FC<CountUpProps> = ({ end, decimals = 0, suffix = '', duration = 750 }) => {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    let startTimestamp: number | null = null;
+    let animationFrameId: number;
+    const step = (timestamp: number) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      const current = progress * end;
+      setCount(current);
+      if (progress < 1) {
+        animationFrameId = window.requestAnimationFrame(step);
+      } else {
+        setCount(end);
+      }
+    };
+    animationFrameId = window.requestAnimationFrame(step);
+    return () => window.cancelAnimationFrame(animationFrameId);
+  }, [end, duration]);
+
+  return <span>{count.toFixed(decimals)}{suffix}</span>;
+};
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -44,8 +75,44 @@ export const DashboardPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center min-h-[400px]">
-        <Loader message="Loading dashboard aggregates..." size="lg" />
+      <div className="flex flex-col gap-6 animate-fade-in">
+        {/* Header bar skeleton */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-2">
+            <div className="h-7 w-48 bg-slate-200 rounded animate-pulse" />
+            <div className="h-3.5 w-32 bg-slate-100/80 rounded animate-pulse" />
+          </div>
+          <div className="h-8 w-28 bg-slate-200 rounded animate-pulse" />
+        </div>
+
+        {/* Metrics Cards Grid skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs flex items-center justify-between">
+              <div className="space-y-3 flex-1">
+                <div className="h-3 w-16 bg-slate-100 rounded animate-pulse" />
+                <div className="h-6 w-12 bg-slate-200 rounded animate-pulse" />
+              </div>
+              <div className="h-10 w-10 bg-slate-100 rounded-lg animate-pulse shrink-0 ml-4" />
+            </div>
+          ))}
+        </div>
+
+        {/* Quick Actions Panel skeleton */}
+        <div className="bg-white p-6 border border-slate-100 rounded-xl shadow-xs">
+          <div className="h-4 w-36 bg-slate-200 rounded mb-4 animate-pulse" />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4 p-4 border border-slate-100 rounded-xl">
+                <div className="h-10 w-10 bg-slate-100 rounded-lg animate-pulse" />
+                <div className="space-y-2 flex-1">
+                  <div className="h-3.5 w-24 bg-slate-200 rounded animate-pulse" />
+                  <div className="h-3 w-32 bg-slate-100 rounded animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -93,92 +160,92 @@ export const DashboardPage: React.FC = () => {
         {/* Total Contacts */}
         <button 
           onClick={() => navigate('/contacts')}
-          className="bg-white p-5 border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/10 rounded-xl shadow-xs flex items-center justify-between transition-all outline-none text-left w-full cursor-pointer"
+          className="bg-white p-5 border border-slate-100/80 hover:border-indigo-200/60 hover:shadow-md rounded-xl shadow-xs flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 outline-none text-left w-full cursor-pointer animate-fade-in"
         >
           <div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
               Total Contacts
             </span>
             <h3 className="text-2xl font-extrabold text-slate-900 mt-2">
-              {widgets?.totalContacts || 0}
+              <CountUp end={widgets?.totalContacts || 0} />
             </h3>
           </div>
-          <div className="p-2.5 bg-indigo-50 border border-indigo-100 rounded-lg text-indigo-600">
+          <div className="p-2.5 bg-indigo-50 border border-indigo-100 rounded-lg text-indigo-650">
             <Users className="h-5 w-5" />
           </div>
         </button>
 
         {/* Verification Success Rate */}
-        <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs flex items-center justify-between">
+        <div className="bg-white p-5 border border-slate-100/80 hover:shadow-md rounded-xl shadow-xs flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 animate-fade-in delay-75">
           <div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
               Verified Contacts
             </span>
             <h3 className="text-2xl font-extrabold text-slate-900 mt-2">
-              {widgets?.verificationRate !== undefined ? `${widgets.verificationRate}%` : '0%'}
+              <CountUp end={widgets?.verificationRate || 0} suffix="%" />
             </h3>
           </div>
-          <div className="p-2.5 bg-violet-50 border border-violet-100 rounded-lg text-violet-600">
+          <div className="p-2.5 bg-violet-50 border border-violet-100 rounded-lg text-violet-650">
             <UserCheck className="h-5 w-5" />
           </div>
         </div>
 
         {/* AI Summary Coverage */}
-        <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs flex items-center justify-between">
+        <div className="bg-white p-5 border border-slate-100/80 hover:shadow-md rounded-xl shadow-xs flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 animate-fade-in delay-100">
           <div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
               AI Summary Coverage
             </span>
             <h3 className="text-2xl font-extrabold text-slate-900 mt-2">
-              {widgets?.aiSummaryCoverage !== undefined ? `${widgets.aiSummaryCoverage}%` : '0%'}
+              <CountUp end={widgets?.aiSummaryCoverage || 0} suffix="%" />
             </h3>
           </div>
-          <div className="p-2.5 bg-purple-50 border border-purple-100 rounded-lg text-purple-600">
+          <div className="p-2.5 bg-purple-50 border border-purple-100 rounded-lg text-purple-650">
             <Activity className="h-5 w-5" />
           </div>
         </div>
 
         {/* OCR Success Rate */}
-        <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs flex items-center justify-between">
+        <div className="bg-white p-5 border border-slate-100/80 hover:shadow-md rounded-xl shadow-xs flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 animate-fade-in delay-150">
           <div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
               OCR Success Rate
             </span>
             <h3 className="text-2xl font-extrabold text-slate-900 mt-2">
-              {ocrRate.toFixed(0)}%
+              <CountUp end={ocrRate} suffix="%" />
             </h3>
           </div>
-          <div className="p-2.5 bg-emerald-50 border border-emerald-100 rounded-lg text-emerald-600">
+          <div className="p-2.5 bg-emerald-50 border border-emerald-100 rounded-lg text-emerald-655">
             <Zap className="h-5 w-5" />
           </div>
         </div>
 
         {/* Face Recognition similarity */}
-        <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs flex items-center justify-between">
+        <div className="bg-white p-5 border border-slate-100/80 hover:shadow-md rounded-xl shadow-xs flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 animate-fade-in delay-200">
           <div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
               Face Similarity
             </span>
             <h3 className="text-2xl font-extrabold text-slate-900 mt-2">
-              {matchAccuracy > 0 ? `${(matchAccuracy * 100).toFixed(0)}%` : '0%'}
+              <CountUp end={matchAccuracy * 100} suffix="%" />
             </h3>
           </div>
-          <div className="p-2.5 bg-sky-50 border border-sky-100 rounded-lg text-sky-600">
+          <div className="p-2.5 bg-sky-50 border border-sky-100 rounded-lg text-sky-655">
             <UserCheck className="h-5 w-5" />
           </div>
         </div>
 
         {/* Average Processing time */}
-        <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs flex items-center justify-between">
+        <div className="bg-white p-5 border border-slate-100/80 hover:shadow-md rounded-xl shadow-xs flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 animate-fade-in delay-300">
           <div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
               Avg OCR Speed
             </span>
             <h3 className="text-2xl font-extrabold text-slate-900 mt-2">
-              {avgOcrTime > 0 ? `${(avgOcrTime / 1000).toFixed(1)}s` : '0.0s'}
+              <CountUp end={avgOcrTime > 0 ? avgOcrTime / 1000 : 0} decimals={1} suffix="s" />
             </h3>
           </div>
-          <div className="p-2.5 bg-rose-50 border border-rose-100 rounded-lg text-rose-600">
+          <div className="p-2.5 bg-rose-50 border border-rose-100 rounded-lg text-rose-650">
             <Clock className="h-5 w-5" />
           </div>
         </div>
@@ -192,9 +259,9 @@ export const DashboardPage: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <button
             onClick={() => navigate('/scanner')}
-            className="flex items-center gap-4 p-4 border border-slate-100 hover:border-indigo-100 hover:bg-indigo-50/20 rounded-xl text-left transition-all duration-200"
+            className="flex items-center gap-4 p-4 border border-slate-100/80 hover:border-indigo-150 hover:bg-indigo-50/5 rounded-xl text-left transition-all duration-250 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer"
           >
-            <div className="p-2.5 bg-indigo-50 border border-indigo-100 rounded-lg text-indigo-600">
+            <div className="p-2.5 bg-indigo-50 border border-indigo-100 rounded-lg text-indigo-650">
               <ScanLine className="h-5 w-5" />
             </div>
             <div>
@@ -205,9 +272,9 @@ export const DashboardPage: React.FC = () => {
 
           <button
             onClick={() => navigate('/qr')}
-            className="flex items-center gap-4 p-4 border border-slate-100 hover:border-sky-100 hover:bg-sky-50/20 rounded-xl text-left transition-all duration-200"
+            className="flex items-center gap-4 p-4 border border-slate-100/80 hover:border-sky-150 hover:bg-sky-50/5 rounded-xl text-left transition-all duration-250 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer"
           >
-            <div className="p-2.5 bg-sky-50 border border-sky-100 rounded-lg text-sky-600">
+            <div className="p-2.5 bg-sky-50 border border-sky-100 rounded-lg text-sky-655">
               <QrCode className="h-5 w-5" />
             </div>
             <div>
@@ -218,9 +285,9 @@ export const DashboardPage: React.FC = () => {
 
           <button
             onClick={() => navigate('/nfc')}
-            className="flex items-center gap-4 p-4 border border-slate-100 hover:border-emerald-100 hover:bg-emerald-50/20 rounded-xl text-left transition-all duration-200"
+            className="flex items-center gap-4 p-4 border border-slate-100/80 hover:border-emerald-150 hover:bg-emerald-50/5 rounded-xl text-left transition-all duration-250 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer"
           >
-            <div className="p-2.5 bg-emerald-50 border border-emerald-100 rounded-lg text-emerald-600">
+            <div className="p-2.5 bg-emerald-50 border border-emerald-100 rounded-lg text-emerald-655">
               <Nfc className="h-5 w-5" />
             </div>
             <div>
@@ -231,9 +298,9 @@ export const DashboardPage: React.FC = () => {
 
           <button
             onClick={() => navigate('/face')}
-            className="flex items-center gap-4 p-4 border border-slate-100 hover:border-fuchsia-100 hover:bg-fuchsia-50/20 rounded-xl text-left transition-all duration-200"
+            className="flex items-center gap-4 p-4 border border-slate-100/80 hover:border-fuchsia-150 hover:bg-fuchsia-50/5 rounded-xl text-left transition-all duration-250 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer"
           >
-            <div className="p-2.5 bg-fuchsia-50 border border-fuchsia-100 rounded-lg text-fuchsia-600">
+            <div className="p-2.5 bg-fuchsia-50 border border-fuchsia-100 rounded-lg text-fuchsia-655">
               <UserCheck className="h-5 w-5" />
             </div>
             <div>
