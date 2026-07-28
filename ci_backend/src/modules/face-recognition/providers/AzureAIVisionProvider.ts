@@ -21,9 +21,7 @@ export class AzureAIVisionProvider implements IReverseFaceSearchProvider {
             url: 'https://linkedin.com/in/johndoe-mock',
             confidence: 0.85,
             source: 'LinkedIn via Azure OSINT',
-            metadata: {
-              location: 'San Francisco, CA'
-            }
+
           }
         ],
         message: 'Search completed successfully, mock match found.',

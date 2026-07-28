@@ -20,10 +20,10 @@ describe('FaceSearchProviderManager', () => {
     });
   });
 
-  describe('searchAllProviders', () => {
-    it('should return empty results if buffer is empty', async () => {
+  describe('search', () => {
+    it('should throw an error if image processing fails', async () => {
       try {
-        await manager.searchAllProviders(Buffer.from(''), 'test-id');
+        await manager.search('');
       } catch (err: any) {
         expect(err.message).toBeDefined();
       }

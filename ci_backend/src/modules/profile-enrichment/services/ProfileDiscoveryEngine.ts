@@ -341,6 +341,8 @@ export class ProfileDiscoveryEngine {
         fullName: parsedTitle.fullName,
         company: parsedTitle.company,
         designation: parsedTitle.designation,
+        headline: meta.title,
+        summary: meta.description,
         experience: [],
         education: [],
         skills: [],

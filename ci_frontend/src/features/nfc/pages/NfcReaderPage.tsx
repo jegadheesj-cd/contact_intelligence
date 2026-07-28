@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import { useReadNfcTag } from '../../../hooks/useIngestion';
 import { useUpdateContact, useCreateContact, useTriggerEnrichment } from '../../../hooks/useContacts';
 import { useToastStore } from '../../../store/useToastStore';
+import { detectPayloadType } from '../utils/payloadDetector';
 import { Button } from '../../../components/Button';
 import {
   Nfc,
@@ -14,16 +16,18 @@ import {
   Edit2,
   Check,
   X,
+  QrCode,
 } from 'lucide-react';
 
 export const NfcReaderPage: React.FC = () => {
   const navigate = useNavigate();
   const addToast = useToastStore((state) => state.addToast);
 
-  // Workflow states: 'idle' | 'listening' | 'processing' | 'review' | 'error'
-  const [step, setStep] = useState<'idle' | 'listening' | 'processing' | 'review' | 'error'>('idle');
+  // Workflow states: 'idle' | 'listening' | 'scanning-qr' | 'processing' | 'review' | 'url-view' | 'error'
+  const [step, setStep] = useState<'idle' | 'listening' | 'scanning-qr' | 'processing' | 'review' | 'url-view' | 'error'>('idle');
   const [isNfcSupported, setIsNfcSupported] = useState(false);
   const [linkedContactId, setLinkedContactId] = useState('');
+  const [urlToEmbed, setUrlToEmbed] = useState('');
 
   // NFC scanning progress states
   const [nfcProgress, setNfcProgress] = useState<'detected' | 'reading' | 'extracting' | 'completed' | null>(null);
@@ -81,13 +85,24 @@ export const NfcReaderPage: React.FC = () => {
             };
           });
 
+          const detected = detectPayloadType({ records });
+
+          if (detected.type === 'URL') {
+            setUrlToEmbed(detected.data);
+            setStep('url-view');
+            addToast('Smart URL detected. Opening profile...', 'info');
+            return;
+          } else if (detected.type === 'UNKNOWN') {
+            throw new Error('Unsupported NFC payload. Could not parse valid contact records.');
+          }
+
           await new Promise((resolve) => setTimeout(resolve, 600));
           setNfcProgress('reading');
           
           await new Promise((resolve) => setTimeout(resolve, 600));
           setNfcProgress('extracting');
 
-          const response = await readNfcMutation.mutateAsync({ payload: { records } });
+          const response = await readNfcMutation.mutateAsync({ payload: detected.originalPayload });
           const contact = response.contact || ({} as any);
           
           setLinkedContactId(contact.id || '');
@@ -118,6 +133,90 @@ export const NfcReaderPage: React.FC = () => {
     }
   };
 
+  const startQrScanning = () => {
+    setStep('scanning-qr');
+  };
+
+  useEffect(() => {
+    let scanner: Html5QrcodeScanner | null = null;
+    
+    if (step === 'scanning-qr') {
+      setTimeout(() => {
+        scanner = new Html5QrcodeScanner(
+          'qr-reader',
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          false
+        );
+
+        scanner.render(
+          async (decodedText) => {
+            if (scanner) {
+              scanner.clear().catch(console.error);
+              scanner = null;
+            }
+
+            const detected = detectPayloadType(decodedText);
+            
+            if (detected.type === 'URL') {
+              setUrlToEmbed(detected.data);
+              setStep('url-view');
+              addToast('Smart URL detected. Opening profile...', 'info');
+              return;
+            } else if (detected.type === 'UNKNOWN') {
+              addToast('Unsupported QR payload format.', 'error');
+              setStep('error');
+              return;
+            }
+            
+            setStep('processing');
+            setNfcProgress('detected');
+            
+            try {
+              await new Promise((resolve) => setTimeout(resolve, 600));
+              setNfcProgress('reading');
+              
+              await new Promise((resolve) => setTimeout(resolve, 600));
+              setNfcProgress('extracting');
+
+              const response = await readNfcMutation.mutateAsync({ payload: detected.originalPayload });
+              const contact = response.contact || ({} as any);
+              
+              setLinkedContactId(contact.id || '');
+              setFormFields({
+                name: contact.name || '',
+                company: contact.company || '',
+                designation: contact.designation || '',
+                email: contact.email || '',
+                phone: contact.phone || '',
+                website: contact.website || '',
+                address: contact.address || '',
+                linkedInUrl: contact.professionalProfile?.mergedProfile?.profileUrl || contact.website || '',
+              });
+
+              setNfcProgress('completed');
+              addToast('QR Code successfully scanned and processed.', 'success');
+              
+              await new Promise((resolve) => setTimeout(resolve, 500));
+              setStep('review');
+            } catch (err: any) {
+              addToast(err.message || 'Failed to process QR Code content.', 'error');
+              setStep('error');
+            }
+          },
+          () => {
+            // Ignored during active scanning
+          }
+        );
+      }, 100);
+    }
+    
+    return () => {
+      if (scanner) {
+        scanner.clear().catch(console.error);
+      }
+    };
+  }, [step]);
+
   // Ingestion Simulator for desktop testing
   const handleSimulatedNfcTap = async (payloadType: 'vcard' | 'json' | 'linkedin') => {
     setStep('processing');
@@ -144,13 +243,23 @@ export const NfcReaderPage: React.FC = () => {
     }
 
     try {
+      const detected = detectPayloadType(simulatedPayload);
+      if (detected.type === 'URL') {
+        setUrlToEmbed(detected.data);
+        setStep('url-view');
+        addToast('Smart URL detected. Opening profile...', 'info');
+        return;
+      } else if (detected.type === 'UNKNOWN') {
+        throw new Error('Unsupported payload format.');
+      }
+
       await new Promise((resolve) => setTimeout(resolve, 600));
       setNfcProgress('reading');
 
       await new Promise((resolve) => setTimeout(resolve, 600));
       setNfcProgress('extracting');
 
-      const response = await readNfcMutation.mutateAsync({ payload: simulatedPayload });
+      const response = await readNfcMutation.mutateAsync({ payload: detected.originalPayload });
       const contact = response.contact || ({} as any);
       
       setLinkedContactId(contact.id || '');
@@ -280,17 +389,25 @@ export const NfcReaderPage: React.FC = () => {
                 <p className="text-xs text-slate-400 mt-1 max-w-xs leading-relaxed">
                   Activate your antenna and place your NFC-enabled business cards against the back of your mobile device.
                 </p>
-                <Button onClick={startNfcListening} className="mt-6 py-2 px-6 text-xs font-bold shadow-sm shadow-indigo-600/10">
-                  Activate NFC Antenna
-                </Button>
+                <div className="mt-6 flex flex-col sm:flex-row gap-3">
+                  <Button onClick={startNfcListening} className="py-2 px-6 text-xs font-bold shadow-sm shadow-indigo-600/10">
+                    Activate NFC Antenna
+                  </Button>
+                  <Button onClick={startQrScanning} variant="outline" className="py-2 px-6 text-xs font-bold">
+                    <QrCode className="h-4 w-4 mr-1.5" /> Scan QR Code
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="bg-amber-50/40 border border-amber-100 rounded-2xl p-8 text-center flex flex-col items-center justify-center min-h-[240px]">
                 <AlertTriangle className="h-10 w-10 text-amber-500 mb-4" />
                 <h2 className="text-sm font-bold text-slate-800">NFC Support Unavailable</h2>
                 <p className="text-xs text-slate-500 mt-1.5 max-w-xs leading-relaxed">
-                  Web NFC API is not supported on this browser/desktop device. You can test NFC scans using the Simulator Console below.
+                  Web NFC API is not supported on this browser/desktop device. You can test NFC scans using the Simulator Console below, or scan a QR code instead.
                 </p>
+                <Button onClick={startQrScanning} className="mt-6 py-2 px-6 text-xs font-bold shadow-sm shadow-indigo-600/10">
+                  <QrCode className="h-4 w-4 mr-1.5" /> Scan QR Code
+                </Button>
               </div>
             )}
 
@@ -353,6 +470,23 @@ export const NfcReaderPage: React.FC = () => {
           <p className="text-xs text-slate-400 mt-1 max-w-xs leading-relaxed">
             Hold your smart card close to the NFC reader antenna. Make sure NFC is enabled on your device.
           </p>
+          <div className="mt-8 flex gap-3">
+            <Button onClick={handleReset} variant="outline" className="text-xs py-1.5 px-4 border-slate-200">
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 2.5: QR Scanning state */}
+      {step === 'scanning-qr' && (
+        <div className="bg-white border border-slate-100 rounded-2xl p-6 md:p-12 text-center flex flex-col items-center justify-center shadow-xs min-h-[350px]">
+          <h2 className="text-lg font-bold text-slate-800 mb-2">Scan QR Code</h2>
+          <p className="text-xs text-slate-400 max-w-md leading-relaxed mb-6">
+            Point your camera at the QR code, or use the option below to upload an image of a QR code from your gallery.
+          </p>
+          <div id="qr-reader" className="w-full max-w-sm rounded-xl overflow-hidden border border-slate-200"></div>
+          
           <div className="mt-8 flex gap-3">
             <Button onClick={handleReset} variant="outline" className="text-xs py-1.5 px-4 border-slate-200">
               Cancel
@@ -517,6 +651,36 @@ export const NfcReaderPage: React.FC = () => {
                 Confirm & Link Profile <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 4.5: URL Viewer */}
+      {step === 'url-view' && (
+        <div className="bg-white border border-slate-100 rounded-2xl flex flex-col items-center justify-center shadow-xs overflow-hidden min-h-[500px] w-full animate-slide-down relative">
+          <div className="w-full bg-slate-50 border-b border-slate-200 p-4 flex items-center justify-between">
+             <div className="flex flex-col">
+               <h2 className="text-sm font-bold text-slate-800">External Profile Detected</h2>
+               <span className="text-[10px] font-semibold text-indigo-500 max-w-sm truncate">{urlToEmbed}</span>
+             </div>
+             <div className="flex items-center gap-2">
+               <Button variant="outline" className="py-1 px-3 text-xs bg-white text-slate-600 border-slate-200" onClick={handleReset}>
+                 Close
+               </Button>
+               <Button className="py-1 px-4 text-xs font-bold" onClick={() => window.open(urlToEmbed, '_blank')}>
+                 Open in New Tab <ArrowRight className="ml-1 h-3.5 w-3.5" />
+               </Button>
+             </div>
+          </div>
+          
+          <div className="w-full flex-1 relative bg-slate-50 flex items-center justify-center h-[600px]">
+             {/* Note: Iframe may show 'Refused to connect' due to X-Frame-Options of the external site */}
+             <iframe 
+               src={urlToEmbed} 
+               className="absolute inset-0 w-full h-full border-0"
+               sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+               title="External NFC Profile"
+             />
           </div>
         </div>
       )}

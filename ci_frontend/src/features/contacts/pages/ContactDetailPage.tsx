@@ -276,20 +276,24 @@ export const ContactDetailPage: React.FC = () => {
 
   const groupCandidatesByPlatform = () => {
     const responses = contact.professionalProfile?.providerResponses;
-    if (!responses || !Array.isArray(responses)) return {};
     
-    const groups: Record<string, any[]> = {};
-    responses.forEach((resp) => {
-      // Ignore objects that are not actual profile candidates (e.g. error responses)
-      if (resp.success === false || !resp.sourceName) return;
+    const groups: Record<string, any[]> = {
+      'LinkedIn': [],
+      'Company Website': [],
+      'GitHub': [],
+      'Portfolio': []
+    };
+    
+    if (responses && Array.isArray(responses)) {
+      responses.forEach((resp) => {
+        if (resp.success === false || !resp.sourceName) return;
+        if (resp.confidence < 40) return;
 
-      // Only display discovered candidates that have at least 40% confidence
-      if (resp.confidence < 40) return;
-
-      const platform = getPlatformName(resp.sourceName);
-      if (!groups[platform]) groups[platform] = [];
-      groups[platform].push(resp);
-    });
+        const platform = getPlatformName(resp.sourceName);
+        if (!groups[platform]) groups[platform] = [];
+        groups[platform].push(resp);
+      });
+    }
     return groups;
   };
 
@@ -938,140 +942,146 @@ export const ContactDetailPage: React.FC = () => {
                     <span>•</span> {platform} Profiles ({responses.length})
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {visibleResponses.map((resp: any, idx: number) => {
-                      const cand = resp.data;
-                      const isBest = idx === 0 && resp.confidence >= 70;
-                      const profileUrl = cand.publicProfiles?.find((p: any) => p.platform.toLowerCase() === platform.toLowerCase() || p.platform === platform)?.url || cand.publicProfiles?.[0]?.url;
+                    {responses.length > 0 ? (
+                      visibleResponses.map((resp: any, idx: number) => {
+                        const cand = resp.data;
+                        const isBest = idx === 0 && resp.confidence >= 70;
+                        const profileUrl = cand.publicProfiles?.find((p: any) => p.platform.toLowerCase() === platform.toLowerCase() || p.platform === platform)?.url || cand.publicProfiles?.[0]?.url;
 
-                      return (
-                        <div key={idx} className={`p-4 rounded-xl border transition-all duration-300 shadow-sm flex flex-col justify-between bg-white group
-                          ${isBest ? 'border-indigo-250 shadow-indigo-100/40 ring-1 ring-indigo-50/50' : 'border-slate-100 hover:border-slate-200'}`}
-                        >
-                          <div>
-                            <div className="flex justify-between items-start gap-2 mb-2">
-                              <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide border select-none
-                                ${cand.verificationStatus === 'VERIFIED' || cand.verificationStatus === 'Verified'
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                  : cand.verificationStatus?.startsWith('Likely Match')
-                                    ? 'bg-amber-50 text-amber-700 border-amber-100'
-                                    : 'bg-slate-50 text-slate-500 border-slate-200'}`}
-                              >
-                                {cand.verificationStatus || 'Unverified'}
-                              </span>
-                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border select-none
-                                ${resp.confidence >= 70 ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}
-                              >
-                                {resp.confidence}% Match
-                              </span>
-                            </div>
+                        return (
+                          <div key={idx} className={`p-4 rounded-xl border transition-all duration-300 shadow-sm flex flex-col justify-between bg-white group
+                            ${isBest ? 'border-indigo-250 shadow-indigo-100/40 ring-1 ring-indigo-50/50' : 'border-slate-100 hover:border-slate-200'}`}
+                          >
+                            <div>
+                              <div className="flex justify-between items-start gap-2 mb-2">
+                                <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide border select-none
+                                  ${cand.verificationStatus === 'VERIFIED' || cand.verificationStatus === 'Verified'
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                    : cand.verificationStatus?.startsWith('Likely Match')
+                                      ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                      : 'bg-slate-50 text-slate-500 border-slate-200'}`}
+                                >
+                                  {cand.verificationStatus || 'Unverified'}
+                                </span>
+                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border select-none
+                                  ${resp.confidence >= 70 ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}
+                                >
+                                  {resp.confidence}% Match
+                                </span>
+                              </div>
 
-                            <div className="flex gap-3 items-center">
-                              {cand.profileImage && (
-                                <img src={cand.profileImage} alt={cand.fullName} className="h-10 w-10 rounded-full object-cover border border-slate-100" />
+                              <div className="flex gap-3 items-center">
+                                {cand.profileImage && (
+                                  <img src={cand.profileImage} alt={cand.fullName} className="h-10 w-10 rounded-full object-cover border border-slate-100" />
+                                )}
+                                <div className="min-w-0">
+                                  <h4 className="text-xs font-black text-slate-800 flex items-center truncate">
+                                    {cand.fullName || contact.name}
+                                    {isBest && (
+                                      <span className="ml-1.5 inline-flex px-1.5 py-0.2 bg-indigo-650 text-white rounded text-[8px] font-black uppercase tracking-wider select-none">
+                                        Best
+                                      </span>
+                                    )}
+                                  </h4>
+                                  <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">
+                                    {cand.designation || cand.headline || 'Professional Profile'}
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              {cand.company && (
+                                <p className="text-[10px] text-slate-500 font-bold mt-2 uppercase tracking-wide">
+                                  Organization: {cand.company}
+                                </p>
                               )}
-                              <div className="min-w-0">
-                                <h4 className="text-xs font-black text-slate-800 flex items-center truncate">
-                                  {cand.fullName || contact.name}
-                                  {isBest && (
-                                    <span className="ml-1.5 inline-flex px-1.5 py-0.2 bg-indigo-650 text-white rounded text-[8px] font-black uppercase tracking-wider select-none">
-                                      Best
-                                    </span>
+                              {cand.location && (
+                                <p className="text-[10px] text-slate-400 font-medium mt-1">
+                                  <MapPin className="h-2.5 w-2.5 inline mr-1" /> {cand.location}
+                                </p>
+                              )}
+
+                              {cand.explainability && (
+                                <div className="mt-4 space-y-2.5 border-t border-slate-100/60 pt-3">
+                                  {cand.explainability.matchedSignals?.length > 0 && (
+                                    <div>
+                                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                                        <Check className="h-2.5 w-2.5 text-emerald-500" /> Matched Signals
+                                      </p>
+                                      <div className="flex flex-wrap gap-1">
+                                        {cand.explainability.matchedSignals.map((sig: string, i: number) => (
+                                          <span key={i} className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100 font-bold">
+                                            {sig}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
                                   )}
-                                </h4>
-                                <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">
-                                  {cand.designation || cand.headline || 'Professional Profile'}
-                                </p>
-                              </div>
+                                  
+                                  {cand.explainability.missingSignals?.length > 0 && (
+                                    <div>
+                                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 mt-2.5 flex items-center gap-1">
+                                        <AlertTriangle className="h-2.5 w-2.5 text-amber-500" /> Missing Signals
+                                      </p>
+                                      <div className="flex flex-wrap gap-1">
+                                        {cand.explainability.missingSignals.map((sig: string, i: number) => (
+                                          <span key={i} className="text-[9px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-100 font-bold">
+                                            {sig}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {cand.explainability.penalties?.length > 0 && (
+                                    <div>
+                                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 mt-2.5 flex items-center gap-1">
+                                        <X className="h-2.5 w-2.5 text-rose-500" /> Penalties Applied
+                                      </p>
+                                      <div className="flex flex-wrap gap-1">
+                                        {cand.explainability.penalties.map((sig: string, i: number) => (
+                                          <span key={i} className="text-[9px] bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded border border-rose-100 font-bold">
+                                            {sig}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {cand.summary && (
+                                <div className="mt-3 bg-slate-50 p-2 rounded-lg border border-slate-100/50">
+                                  <p className="text-[10px] text-slate-600 line-clamp-3 leading-relaxed font-medium">
+                                    {cand.summary}
+                                  </p>
+                                </div>
+                              )}
                             </div>
-                            
-                            {cand.company && (
-                              <p className="text-[10px] text-slate-500 font-bold mt-2 uppercase tracking-wide">
-                                Organization: {cand.company}
-                              </p>
-                            )}
-                            {cand.location && (
-                              <p className="text-[10px] text-slate-400 font-medium mt-1">
-                                <MapPin className="h-2.5 w-2.5 inline mr-1" /> {cand.location}
-                              </p>
-                            )}
 
-                            {cand.explainability && (
-                              <div className="mt-4 space-y-2.5 border-t border-slate-100/60 pt-3">
-                                {cand.explainability.matchedSignals?.length > 0 && (
-                                  <div>
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                                      <Check className="h-2.5 w-2.5 text-emerald-500" /> Matched Signals
-                                    </p>
-                                    <div className="flex flex-wrap gap-1">
-                                      {cand.explainability.matchedSignals.map((sig: string, i: number) => (
-                                        <span key={i} className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100 font-bold">
-                                          {sig}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                                
-                                {cand.explainability.missingSignals?.length > 0 && (
-                                  <div>
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 mt-2.5 flex items-center gap-1">
-                                      <AlertTriangle className="h-2.5 w-2.5 text-amber-500" /> Missing Signals
-                                    </p>
-                                    <div className="flex flex-wrap gap-1">
-                                      {cand.explainability.missingSignals.map((sig: string, i: number) => (
-                                        <span key={i} className="text-[9px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-100 font-bold">
-                                          {sig}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {cand.explainability.penalties?.length > 0 && (
-                                  <div>
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 mt-2.5 flex items-center gap-1">
-                                      <X className="h-2.5 w-2.5 text-rose-500" /> Penalties Applied
-                                    </p>
-                                    <div className="flex flex-wrap gap-1">
-                                      {cand.explainability.penalties.map((sig: string, i: number) => (
-                                        <span key={i} className="text-[9px] bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded border border-rose-100 font-bold">
-                                          {sig}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {cand.summary && (
-                              <div className="mt-3 bg-slate-50 p-2 rounded-lg border border-slate-100/50">
-                                <p className="text-[10px] text-slate-600 line-clamp-3 leading-relaxed font-medium">
-                                  {cand.summary}
-                                </p>
-                              </div>
-                            )}
+                            <div className="mt-4 pt-3 border-t border-slate-100/60 flex items-center justify-between">
+                              {profileUrl ? (
+                                <a href={profileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-650 hover:underline">
+                                  View Profile <ExternalLink className="h-3 w-3" />
+                                </a>
+                              ) : (
+                                <span className="text-[10px] text-slate-400 font-medium italic">No URL linked</span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setSelectedCandidate(cand)}
+                                className="text-[10px] font-bold text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-slate-100 px-2 py-1 rounded transition-colors"
+                              >
+                                Expand Details
+                              </button>
+                            </div>
                           </div>
-
-                          <div className="mt-4 pt-3 border-t border-slate-100/60 flex items-center justify-between">
-                            {profileUrl ? (
-                              <a href={profileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-650 hover:underline">
-                                View Profile <ExternalLink className="h-3 w-3" />
-                              </a>
-                            ) : (
-                              <span className="text-[10px] text-slate-400 font-medium italic">No URL linked</span>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => setSelectedCandidate(cand)}
-                              className="text-[10px] font-bold text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-slate-100 px-2 py-1 rounded transition-colors"
-                            >
-                              Expand Details
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })
+                    ) : (
+                      <div className="md:col-span-2 bg-slate-50/50 py-8 px-4 border border-slate-150 border-dashed rounded-xl text-center flex flex-col items-center justify-center">
+                        <p className="text-xs text-slate-400 italic">No verified matching profiles discovered on {platform}.</p>
+                      </div>
+                    )}
                   </div>
                   
                   {hiddenCount > 0 && (

@@ -6,6 +6,7 @@ import { generateTextWithFallback } from '../../utils/aiClient';
 import { stringSimilarity } from '../../utils/stringUtils';
 import { IdentityResolver } from './services/IdentityResolver';
 import { SearchIntelligenceEngine } from './services/SearchIntelligenceEngine';
+import { PhantomBusterEnricher } from './services/providers/PhantomBusterEnricher';
 import { ProfileDiscoveryEngine, CandidateProfile } from './services/ProfileDiscoveryEngine';
 import { SearchRankingEngine } from './services/SearchRankingEngine';
 import { ProfileMergeService, ProviderResponse } from './services/ProfileMergeService';
@@ -13,6 +14,7 @@ import { EnterpriseIdentityResolutionEngine } from './services/EnterpriseIdentit
 
 const identityResolver = new IdentityResolver();
 const searchIntelligenceEngine = new SearchIntelligenceEngine();
+const phantomBusterEnricher = new PhantomBusterEnricher();
 const discoveryEngine = new ProfileDiscoveryEngine();
 const rankingEngine = new SearchRankingEngine();
 const mergeService = new ProfileMergeService();
@@ -220,6 +222,27 @@ export class ProfileEnrichmentService {
       
       return false; // Reject: Belongs to a different person
     });
+
+    // ─── NEW: PhantomBuster Deep Enrichment ───
+    if (bestVerification.isVerified && bestCandidate) {
+      const linkedInProfile = bestCandidate.publicProfiles.find((p: any) => p.platform.toLowerCase() === 'linkedin');
+      if (linkedInProfile && linkedInProfile.url) {
+        logger.info(`[DiscoveryPipeline] Verified LinkedIn URL found: ${linkedInProfile.url}. Triggering PhantomBuster.`);
+        
+        // Invoke PhantomBuster
+        const pbProfile = await phantomBusterEnricher.enrichProfile(linkedInProfile.url);
+        
+        if (pbProfile) {
+          logger.info(`[DiscoveryPipeline] PhantomBuster enrichment successful. Injecting into merge pipeline.`);
+          // Inject into linkedResponses with high confidence
+          linkedResponses.push({
+            sourceName: pbProfile.source,
+            confidence: pbProfile.sourceConfidence,
+            data: pbProfile
+          });
+        }
+      }
+    }
 
     // Step 3: Merge ONLY confidently linked candidates together (LinkedIn + GitHub + CompanyWeb of the SAME person)
     logger.info(`[DiscoveryPipeline] Executing stage: Merge Service for ${linkedResponses.length} confidently linked profiles`);

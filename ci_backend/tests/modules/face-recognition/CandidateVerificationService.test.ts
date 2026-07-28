@@ -8,26 +8,27 @@ describe('CandidateVerificationService', () => {
   });
 
   describe('verifyCandidates', () => {
-    it('should return empty result if no candidates provided', async () => {
-      const result = await service.verifyCandidates('test-user-id', []);
-      expect(result.success).toBe(false);
-      expect(result.message).toBe('No candidates to verify');
+    it('should return empty result if no candidates provided', () => {
+      const result = service.verifyCandidates([]);
+      expect(result).toEqual([]);
     });
 
-    it('should aggregate matching scores correctly', async () => {
+    it('should aggregate matching scores correctly', () => {
       const candidates = [
         {
-          provider: 'azure',
-          sourceUrl: 'https://linkedin.com/in/johndoe',
+          source: 'azure',
+          url: 'https://linkedin.com/in/johndoe',
           confidence: 85,
         },
       ];
       
-      const result = await service.verifyCandidates('test-user-id', candidates);
+      const result = service.verifyCandidates(candidates);
       
-      // Expected to mock database or test the core logic of confidence scoring
-      expect(result.success).toBe(true);
-      expect(result.provider).toBe('azure');
+      expect(result.length).toBe(1);
+      // LinkedIn is a HIGH trust source, so it gets +10 confidence (capped at 99.9 if over)
+      // 85 + 10 = 95
+      expect(result[0].confidence).toBe(95);
+      expect(result[0].source).toBe('azure');
     });
   });
 
