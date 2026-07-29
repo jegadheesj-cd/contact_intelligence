@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { parseBiography } from '../utils/biographyParser';
 import {
   useContact,
   useUpdateContact,
@@ -125,7 +126,51 @@ export const ContactDetailPage: React.FC = () => {
         setIsEnrichmentActive(false);
       }
     }
-  }, [contact]);
+  }, [contact]);  // Derived profile helper values (safe for loading/error states)
+  const rawProfile = contact?.professionalProfile?.mergedProfile as any;
+  const flatProfile: any = {};
+  if (rawProfile) {
+    for (const [key, val] of Object.entries(rawProfile)) {
+      if (val && typeof val === 'object' && 'value' in (val as any)) {
+        flatProfile[key] = (val as any).value;
+      } else {
+        flatProfile[key] = val;
+      }
+    }
+  }
+  const aiProfile = rawProfile ? flatProfile : null;
+
+  const parsedBio = useMemo(() => {
+    if (!contact) return { experience: [], education: [] };
+    const getBiographyText = () => {
+      if (aiProfile?.summary) return aiProfile.summary;
+      if (aiProfile?.companyBio) return aiProfile.companyBio;
+      const responses = contact.professionalProfile?.providerResponses;
+      if (Array.isArray(responses)) {
+        for (const resp of responses) {
+          if (resp.summary) return resp.summary;
+          if (resp.companyBio) return resp.companyBio;
+        }
+      }
+      return '';
+    };
+    const bioText = getBiographyText();
+    return parseBiography(bioText);
+  }, [contact, aiProfile]);
+
+  const experiencesToDisplay = useMemo(() => {
+    if (aiProfile?.experience && aiProfile.experience.length > 0) {
+      return aiProfile.experience;
+    }
+    return parsedBio.experience;
+  }, [aiProfile?.experience, parsedBio.experience]);
+
+  const educationToDisplay = useMemo(() => {
+    if (aiProfile?.education && aiProfile.education.length > 0) {
+      return aiProfile.education;
+    }
+    return parsedBio.education;
+  }, [aiProfile?.education, parsedBio.education]);
 
   if (isLoading) {
     return (
@@ -201,18 +246,7 @@ export const ContactDetailPage: React.FC = () => {
     .toUpperCase();
 
   const enrichmentStatus = contact.professionalProfile?.enrichmentStatus || 'PENDING';
-  const rawProfile = contact.professionalProfile?.mergedProfile as any;
-  const flatProfile: any = {};
-  if (rawProfile) {
-    for (const [key, val] of Object.entries(rawProfile)) {
-      if (val && typeof val === 'object' && 'value' in (val as any)) {
-        flatProfile[key] = (val as any).value;
-      } else {
-        flatProfile[key] = val;
-      }
-    }
-  }
-  const aiProfile = rawProfile ? flatProfile : null;
+
   const verificationStatus = contact.professionalProfile?.verificationStatus;
   const verificationConfidence = contact.professionalProfile?.verificationConfidence;
 
@@ -609,16 +643,16 @@ export const ContactDetailPage: React.FC = () => {
                   <Briefcase className="h-4 w-4 text-indigo-500" /> Career History {renderBadge('experience')}
                 </h2>
                 
-                {aiProfile?.experience && aiProfile.experience.length > 0 ? (
+                {experiencesToDisplay && experiencesToDisplay.length > 0 ? (
                   <div className="relative border-l-2 border-slate-100 pl-5 ml-2.5 space-y-6 py-2">
-                    {aiProfile.experience.map((exp: any, idx: number) => (
+                    {experiencesToDisplay.map((exp: any, idx: number) => (
                       <div key={idx} className="relative flex flex-col gap-1 animate-slide-up opacity-0" style={{ animationDelay: `${idx * 40}ms`, animationFillMode: 'forwards' }}>
                         <span className="absolute -left-[26px] top-1.5 h-3.5 w-3.5 rounded-full bg-indigo-500 border-2 border-white shadow-sm" />
-                        <h3 className="text-xs font-bold text-slate-900 leading-tight">{exp.title}</h3>
+                        <h3 className="text-xs font-bold text-slate-900 leading-tight">{exp.title || exp.designation || 'Professional Role'}</h3>
                         <div className="flex items-center text-[10px] text-slate-555 font-bold">
-                          <span className="text-indigo-650">{exp.company}</span>
-                          <span className="mx-2">•</span>
-                          <span>{exp.period}</span>
+                          {exp.company && <span className="text-indigo-650">{exp.company}</span>}
+                          {exp.company && (exp.period || exp.duration) && <span className="mx-2">•</span>}
+                          {(exp.period || exp.duration) && <span>{exp.period || exp.duration}</span>}
                         </div>
                         {exp.description && (
                           <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1.5">{exp.description}</p>
@@ -637,20 +671,16 @@ export const ContactDetailPage: React.FC = () => {
                   <Award className="h-4 w-4 text-purple-500" /> Academic Background {renderBadge('education')}
                 </h2>
                 
-                {aiProfile?.education && aiProfile.education.length > 0 ? (
+                {educationToDisplay && educationToDisplay.length > 0 ? (
                   <div className="relative border-l-2 border-slate-100 pl-5 ml-2.5 space-y-6 py-2">
-                    {aiProfile.education.map((edu: any, idx: number) => (
+                    {educationToDisplay.map((edu: any, idx: number) => (
                       <div key={idx} className="relative flex flex-col gap-1 animate-slide-up opacity-0" style={{ animationDelay: `${idx * 40}ms`, animationFillMode: 'forwards' }}>
                         <span className="absolute -left-[26px] top-1.5 h-3.5 w-3.5 rounded-full bg-purple-550 border-2 border-white shadow-sm" />
-                        <h3 className="text-xs font-bold text-slate-900 leading-tight">{edu.degree}</h3>
+                        <h3 className="text-xs font-bold text-slate-900 leading-tight">{edu.degree || 'Academic Degree'}</h3>
                         <div className="flex items-center text-[10px] text-slate-555 font-bold">
-                          <span className="text-purple-650">{edu.school}</span>
-                          {edu.year && (
-                            <>
-                              <span className="mx-2">•</span>
-                              <span>Class of {edu.year}</span>
-                            </>
-                          )}
+                          {edu.school && <span className="text-purple-650">{edu.school}</span>}
+                          {edu.school && edu.year && <span className="mx-2">•</span>}
+                          {edu.year && <span>Class of {edu.year}</span>}
                         </div>
                         {edu.fieldOfStudy && (
                           <p className="text-[11px] text-slate-500 font-semibold mt-1">Field of Study: {edu.fieldOfStudy}</p>
