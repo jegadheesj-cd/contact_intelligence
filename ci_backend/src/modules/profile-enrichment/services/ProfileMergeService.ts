@@ -73,7 +73,8 @@ export class ProfileMergeService {
       repositories: { value: [], source: 'None', confidence: 0, timestamp, verification: 'Unverified' },
       pinnedRepositories: { value: [], source: 'None', confidence: 0, timestamp, verification: 'Unverified' },
       primaryLanguages: { value: [], source: 'None', confidence: 0, timestamp, verification: 'Unverified' },
-      technologies: { value: [], source: 'None', confidence: 0, timestamp, verification: 'Unverified' }
+      technologies: { value: [], source: 'None', confidence: 0, timestamp, verification: 'Unverified' },
+      scrapeCreatorsData: { value: [], source: 'None', confidence: 0, timestamp, verification: 'Unverified' }
     };
 
     const sourceAttribution: Record<string, any> = {};
@@ -191,6 +192,34 @@ export class ProfileMergeService {
             verification
           };
           sourceAttribution.publicProfiles = mergedProfile.publicProfiles;
+        }
+      }
+
+      // 6. ScrapeCreators data (merge all unique platform responses)
+      if (response.data.scrapeCreatorsData) {
+        const existingData = mergedProfile.scrapeCreatorsData.value || [];
+        const newData = [...existingData];
+        const incoming = Array.isArray(response.data.scrapeCreatorsData)
+          ? response.data.scrapeCreatorsData
+          : [response.data.scrapeCreatorsData];
+        
+        let hasNew = false;
+        for (const item of incoming) {
+          if (item && item.platform && !newData.some((existing: any) => existing.platform === item.platform)) {
+            newData.push(item);
+            hasNew = true;
+          }
+        }
+        
+        if (hasNew || (newData.length > 0 && existingData.length === 0)) {
+          mergedProfile.scrapeCreatorsData = {
+            value: newData,
+            source: response.sourceName,
+            confidence: response.confidence,
+            timestamp,
+            verification
+          };
+          sourceAttribution.scrapeCreatorsData = mergedProfile.scrapeCreatorsData;
         }
       }
     }

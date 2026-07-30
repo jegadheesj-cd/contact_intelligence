@@ -1,6 +1,7 @@
 import { IReverseFaceSearchProvider, ReverseFaceSearchResponse } from './IReverseFaceSearchProvider';
 import { PimEyesProvider } from './PimEyesProvider';
 import { AzureAIVisionProvider } from './AzureAIVisionProvider';
+import { GoogleReverseImageProvider } from './GoogleReverseImageProvider';
 import { AppError } from '../../../utils/AppError';
 import logger from '../../../config/logger';
 import redisClient from '../../../config/redis';
@@ -20,6 +21,8 @@ export class FaceSearchProviderManager {
     const providerMap: Record<string, IReverseFaceSearchProvider> = {
       'azure': new AzureAIVisionProvider(),
       'pimeyes': new PimEyesProvider(),
+      'google': new GoogleReverseImageProvider(),
+      'serpapi': new GoogleReverseImageProvider(),
     };
 
     if (providerMap[primary]) this.providers.push(providerMap[primary]);
@@ -78,9 +81,11 @@ export class FaceSearchProviderManager {
     // 2. Check Cache
     try {
       const cached = await redisClient.get(cacheKey);
-      if (cached) {
+      if (cached && process.env.NODE_ENV !== 'development') {
         logger.info(`[FaceSearchProviderManager] Cache hit for image content hash: ${fileHash}`);
         return JSON.parse(cached);
+      } else if (cached && process.env.NODE_ENV === 'development') {
+        logger.info(`[FaceSearchProviderManager] Development mode: Bypassing cached face search response to query provider live.`);
       }
     } catch (err) {
       logger.warn(`[FaceSearchProviderManager] Redis cache read failed: ${err}`);

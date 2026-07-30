@@ -24,6 +24,10 @@ const envSchema = z.object({
   GOOGLE_KNOWLEDGE_GRAPH_API_KEY: z.string().optional(),
   BING_SEARCH_API_KEY: z.string().optional(),
   TAVILY_API_KEY: z.string().optional(),
+  SCRAPECREATORS_API_KEY: z.string().optional(),
+  SCRAPECREATORS_BASE_URL: z.string().url().default('https://api.scrapecreators.com'),
+  SCRAPECREATORS_TIMEOUT: z.preprocess((val) => val ? Number(val) : 15000, z.number().default(15000)),
+  SERPAPI_API_KEY: z.string().optional(),
   SEARCH_PROVIDER: z.enum(['brave', 'google_custom', 'bing', 'tavily', 'fallback']).default('fallback'),
 });
 

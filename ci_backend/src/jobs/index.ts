@@ -21,7 +21,7 @@ const enrichmentService = new ProfileEnrichmentService();
 const aiSummaryService = new AiSummaryService();
 const faceService = new FaceRecognitionService();
 const contactsService = new ContactsService();
-const faceSearchManager = new FaceSearchProviderManager();
+const faceSearchManager = new FaceSearchProviderManager(); // Trigger reload: SerpApi provider active with cache bypass
 const candidateVerificationService = new CandidateVerificationService();
 
 // 1. OCR Processing Worker

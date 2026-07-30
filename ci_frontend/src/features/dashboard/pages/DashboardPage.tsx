@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDashboardWidgets, useDashboardAnalytics } from '../../../hooks/useDashboard';
-import { Loader } from '../../../components/Loader';
 import { Button } from '../../../components/Button';
 import {
   Users,

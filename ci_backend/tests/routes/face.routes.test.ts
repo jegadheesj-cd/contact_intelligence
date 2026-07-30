@@ -1,5 +1,5 @@
 import request from 'supertest';
-import app from '../../src/server';
+import app from '../../src/app';
 
 describe('Face Routes', () => {
   describe('GET /api/face/profile/:id/progress', () => {

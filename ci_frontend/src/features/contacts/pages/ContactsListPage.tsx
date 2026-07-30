@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useContacts, useCreateContact, useUpdateContact, useDeleteContact } from '../../../hooks/useContacts';
 import { useToastStore } from '../../../store/useToastStore';
-import { Loader } from '../../../components/Loader';
 import { Button } from '../../../components/Button';
 import { ContactFormModal } from '../components/ContactFormModal';
 import { ConfirmModal } from '../../../components/ConfirmModal';

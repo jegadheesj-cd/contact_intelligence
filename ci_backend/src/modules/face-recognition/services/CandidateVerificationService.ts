@@ -40,7 +40,7 @@ export class CandidateVerificationService {
       };
     }).filter(candidate => {
       // Minimum verification threshold set to 65% after all weighting
-      return candidate.confidence >= 65;
+      return candidate.confidence >= 20;
     });
 
     // Sort by highest confidence descending
@@ -55,8 +55,8 @@ export class CandidateVerificationService {
       const urlObj = new URL(url);
       const hostname = urlObj.hostname.replace('www.', '');
       
-      const highTrust = ['linkedin.com', 'github.com', 'scholar.google.com', 'researchgate.net'];
-      const lowTrust = ['pinterest.com', 'stock', 'alamy', 'shutterstock', 'freepik', 'facebook.com', 'instagram.com'];
+      const highTrust = ['linkedin.com', 'github.com', 'scholar.google.com', 'researchgate.net', 'facebook.com', 'instagram.com', 'youtube.com'];
+      const lowTrust = ['pinterest.com', 'stock', 'alamy', 'shutterstock', 'freepik'];
       
       if (highTrust.some(domain => hostname.includes(domain))) return 'HIGH';
       if (lowTrust.some(domain => hostname.includes(domain))) return 'LOW';

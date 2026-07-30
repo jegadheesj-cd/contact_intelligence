@@ -42,6 +42,27 @@ import {
   FolderGit2,
 } from 'lucide-react';
 
+const Instagram = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+    <path d="M16 11.37A4.06 4.06 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+    <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+  </svg>
+);
+
+const Facebook = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+  </svg>
+);
+
+const Youtube = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17z" />
+    <polygon points="9.7 15 15.2 12 9.7 9" />
+  </svg>
+);
+
 interface CountUpProps {
   end: number;
   decimals?: number;
@@ -336,6 +357,7 @@ export const ContactDetailPage: React.FC = () => {
     if (s.includes('twitter') || s.includes('x.com')) return 'Twitter/X';
     if (s.includes('instagram')) return 'Instagram';
     if (s.includes('facebook')) return 'Facebook';
+    if (s.includes('youtube')) return 'YouTube';
     return 'Other Platforms';
   };
 
@@ -563,19 +585,146 @@ export const ContactDetailPage: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in animate-slide-up">
             
             {/* Left Column: Basic editable info card */}
-            <div className="lg:col-span-7 bg-white p-5 border border-slate-100 rounded-xl shadow-xs flex flex-col gap-4">
-              <h2 className="text-xs font-bold text-slate-800 tracking-wider uppercase border-b border-slate-50 pb-2">
-                Basic Credentials
-              </h2>
-              <div className="flex flex-col gap-1.5">
-                {renderInlineEditRow('name', 'Full Name', <Users className="h-3.5 w-3.5 text-slate-400" />, contact.name)}
-                {renderInlineEditRow('company', 'Company', <Briefcase className="h-3.5 w-3.5 text-slate-400" />, contact.company)}
-                {renderInlineEditRow('designation', 'Designation', <Briefcase className="h-3.5 w-3.5 text-slate-400" />, contact.designation)}
-                {renderInlineEditRow('email', 'Email Address', <Mail className="h-3.5 w-3.5 text-slate-400" />, contact.email)}
-                {renderInlineEditRow('phone', 'Phone Number', <Phone className="h-3.5 w-3.5 text-slate-400" />, contact.phone)}
-                {renderInlineEditRow('website', 'Website URL', <Globe className="h-3.5 w-3.5 text-slate-400" />, contact.website)}
-                {renderInlineEditRow('address', 'Location / Address', <MapPin className="h-3.5 w-3.5 text-slate-400" />, contact.address)}
+            <div className="lg:col-span-7 flex flex-col gap-6">
+              <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs flex flex-col gap-4">
+                <h2 className="text-xs font-bold text-slate-800 tracking-wider uppercase border-b border-slate-50 pb-2">
+                  Basic Credentials
+                </h2>
+                <div className="flex flex-col gap-1.5">
+                  {renderInlineEditRow('name', 'Full Name', <Users className="h-3.5 w-3.5 text-slate-400" />, contact.name)}
+                  {renderInlineEditRow('company', 'Company', <Briefcase className="h-3.5 w-3.5 text-slate-400" />, contact.company)}
+                  {renderInlineEditRow('designation', 'Designation', <Briefcase className="h-3.5 w-3.5 text-slate-400" />, contact.designation)}
+                  {renderInlineEditRow('email', 'Email Address', <Mail className="h-3.5 w-3.5 text-slate-400" />, contact.email)}
+                  {renderInlineEditRow('phone', 'Phone Number', <Phone className="h-3.5 w-3.5 text-slate-400" />, contact.phone)}
+                  {renderInlineEditRow('website', 'Website URL', <Globe className="h-3.5 w-3.5 text-slate-400" />, contact.website)}
+                  {renderInlineEditRow('address', 'Location / Address', <MapPin className="h-3.5 w-3.5 text-slate-400" />, contact.address)}
+                </div>
               </div>
+
+              {/* ScrapeCreators Social Details Card */}
+              {aiProfile?.scrapeCreatorsData && aiProfile.scrapeCreatorsData.length > 0 && (
+                <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs flex flex-col gap-5 animate-fade-in animate-slide-up">
+                  <h2 className="text-xs font-bold text-slate-800 tracking-wider uppercase border-b border-slate-50 pb-2">
+                    Social Channels Insights
+                  </h2>
+                  <div className="flex flex-col gap-6">
+                    {aiProfile.scrapeCreatorsData.map((social: any, idx: number) => {
+                      const isInstagram = social.platform === 'Instagram';
+                      const isFacebook = social.platform === 'Facebook';
+                      const isYouTube = social.platform === 'YouTube';
+                      
+                      let themeColor = 'from-slate-50 to-white border-slate-100 text-slate-700';
+                      let icon = <Globe className="h-4 w-4 text-slate-400" />;
+                      
+                      if (isInstagram) {
+                        themeColor = 'from-pink-50/20 to-white border-pink-100/50 text-pink-700';
+                        icon = <Instagram className="h-4 w-4 text-pink-500" />;
+                      } else if (isFacebook) {
+                        themeColor = 'from-blue-50/20 to-white border-blue-100/50 text-blue-700';
+                        icon = <Facebook className="h-4 w-4 text-blue-500" />;
+                      } else if (isYouTube) {
+                        themeColor = 'from-red-50/20 to-white border-red-100/50 text-red-750';
+                        icon = <Youtube className="h-4 w-4 text-red-650" />;
+                      }
+                      
+                      return (
+                        <div key={idx} className={`p-4 bg-gradient-to-br ${themeColor} border rounded-xl shadow-sm hover:scale-[1.01] transition-transform duration-300`}>
+                          <div className="flex justify-between items-start gap-4 mb-3">
+                            <div className="flex gap-3 items-center min-w-0">
+                              {social.profileImageUrl ? (
+                                <img
+                                  src={social.profileImageUrl}
+                                  alt={social.displayName || social.username}
+                                  className="h-10 w-10 rounded-full object-cover border border-slate-100 shadow-sm"
+                                  onError={(e) => {
+                                    (e.target as any).style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                                  {icon}
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <h3 className="text-xs font-black text-slate-800 flex items-center gap-1.5 truncate">
+                                  {social.displayName || social.username || `${social.platform} Profile`}
+                                  {social.verified && (
+                                    <span className="inline-flex h-3.5 w-3.5 bg-blue-500 text-white rounded-full text-[8px] items-center justify-center font-black select-none" title="Verified Badge">
+                                      ✓
+                                    </span>
+                                  )}
+                                </h3>
+                                {social.username && (
+                                  <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">
+                                    @{social.username}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <a
+                              href={social.profileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1 bg-white border border-slate-200 hover:border-slate-350 text-slate-500 rounded-lg hover:text-slate-800 transition-colors shadow-sm shrink-0 cursor-pointer"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          </div>
+
+                          {social.bio && (
+                            <p className="text-xs text-slate-650 leading-relaxed font-medium mt-2 bg-white/40 p-2.5 rounded-lg border border-slate-100/50">
+                              {social.bio}
+                            </p>
+                          )}
+
+                          <div className="grid grid-cols-3 gap-2 mt-3.5 border-t border-slate-100/55 pt-3 text-center">
+                            {social.followersCount !== undefined && (
+                              <div>
+                                <span className="text-[9px] text-slate-400 block font-bold uppercase">
+                                  {isYouTube ? 'Subscribers' : 'Followers'}
+                                </span>
+                                <span className="text-xs font-black text-slate-850">
+                                  {social.followersCount.toLocaleString()}
+                                </span>
+                              </div>
+                            )}
+                            {social.followingCount !== undefined && !isYouTube && (
+                              <div>
+                                <span className="text-[9px] text-slate-400 block font-bold uppercase">Following</span>
+                                <span className="text-xs font-black text-slate-850">
+                                  {social.followingCount.toLocaleString()}
+                                </span>
+                              </div>
+                            )}
+                            {social.postCount !== undefined && !isYouTube && (
+                              <div>
+                                <span className="text-[9px] text-slate-400 block font-bold uppercase">Posts</span>
+                                <span className="text-xs font-black text-slate-850">
+                                  {social.postCount.toLocaleString()}
+                                </span>
+                              </div>
+                            )}
+                            {social.category && (
+                              <div className="col-span-3 mt-2 text-left flex items-center gap-1.5">
+                                <span className="text-[9px] text-slate-400 uppercase font-black">Category:</span>
+                                <span className="text-[10px] bg-slate-50 border border-slate-250 px-2 py-0.5 rounded text-slate-750 font-bold">
+                                  {social.category}
+                                </span>
+                              </div>
+                            )}
+                            {social.location && (
+                              <div className="col-span-3 mt-1.5 text-left text-[10px] text-slate-500 font-semibold">
+                                <MapPin className="h-3 w-3 inline mr-1 text-slate-400" /> {social.location}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Right Column: AI Merged Summary & Skills */}

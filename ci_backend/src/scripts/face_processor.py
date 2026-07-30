@@ -145,9 +145,51 @@ def match_face(media_path, enrolled_profiles_path, is_video=False):
             "message": "Face detected, but no matching enrolled contact was found in the database."
         }
 
+def crop_face(image_path, output_path):
+    app = get_face_analyzer()
+    img = cv2.imread(image_path)
+    if img is None:
+        raise ValueError(f"Could not read image: {image_path}")
+        
+    faces = app.get(img)
+    if not faces:
+        import shutil
+        shutil.copyfile(image_path, output_path)
+        return {"success": True, "face_detected": False, "cropped_path": output_path}
+        
+    faces = sorted(faces, key=lambda x: (x.bbox[2] - x.bbox[0]) * (x.bbox[3] - x.bbox[1]), reverse=True)
+    face = faces[0]
+    
+    bbox = [int(x) for x in face.bbox]
+    left, top, right, bottom = bbox[0], bbox[1], bbox[2], bbox[3]
+    
+    height, width, _ = img.shape
+    pad_h = int((bottom - top) * 0.45)
+    pad_w = int((right - left) * 0.45)
+    
+    crop_top = max(0, top - pad_h)
+    crop_bottom = min(height, bottom + pad_h)
+    crop_left = max(0, left - pad_w)
+    crop_right = min(width, right + pad_w)
+    
+    cropped_img = img[crop_top:crop_bottom, crop_left:crop_right]
+    cv2.imwrite(output_path, cropped_img)
+    
+    return {
+        "success": True,
+        "face_detected": True,
+        "cropped_path": output_path,
+        "bbox": {
+            "left": left,
+            "top": top,
+            "width": right - left,
+            "height": bottom - top
+        }
+    }
+
 def main():
     if len(sys.argv) < 3:
-        print(json.dumps({"success": False, "message": "Usage: python face_processor.py [detect|match] <media_path> [enrolled_json_path] [is_video]"}), flush=True)
+        print(json.dumps({"success": False, "message": "Usage: python face_processor.py [detect|match|crop-face] <media_path> [output_path/enrolled_json_path] [is_video]"}), flush=True)
         sys.exit(1)
         
     action = sys.argv[1]
@@ -170,6 +212,14 @@ def main():
             else:
                 print(json.dumps({"success": True, "face_detected": False, "message": "No face detected"}), flush=True)
                 
+        elif action == "crop-face":
+            if len(sys.argv) < 4:
+                print(json.dumps({"success": False, "message": "output_path is required for crop-face"}), flush=True)
+                sys.exit(1)
+            output_path = sys.argv[3]
+            result = crop_face(media_path, output_path)
+            print(json.dumps(result), flush=True)
+            
         elif action == "match":
             if len(sys.argv) < 4:
                 print(json.dumps({"success": False, "message": "enrolled_json_path is required for matching"}), flush=True)

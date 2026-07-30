@@ -11,6 +11,7 @@ import { ProfileDiscoveryEngine, CandidateProfile } from './services/ProfileDisc
 import { SearchRankingEngine } from './services/SearchRankingEngine';
 import { ProfileMergeService, ProviderResponse } from './services/ProfileMergeService';
 import { EnterpriseIdentityResolutionEngine } from './services/EnterpriseIdentityResolutionEngine';
+import { ScrapeCreatorsProvider } from './services/providers/ScrapeCreatorsProvider';
 
 const identityResolver = new IdentityResolver();
 const searchIntelligenceEngine = new SearchIntelligenceEngine();
@@ -240,6 +241,58 @@ export class ProfileEnrichmentService {
             confidence: pbProfile.sourceConfidence,
             data: pbProfile
           });
+        }
+      }
+    }
+
+    // ─── NEW: ScrapeCreators Enrichment ───
+    const scrapeCreatorsProvider = new ScrapeCreatorsProvider();
+    if (scrapeCreatorsProvider.isConfigured()) {
+      const socialUrls: { instagram?: string; facebook?: string; youtube?: string } = {};
+      
+      const inspectUrl = (url: string) => {
+        if (!url) return;
+        const lUrl = url.toLowerCase();
+        if (lUrl.includes('instagram.com/')) {
+          socialUrls.instagram = url;
+        } else if (lUrl.includes('facebook.com/')) {
+          socialUrls.facebook = url;
+        } else if (lUrl.includes('youtube.com/') || lUrl.includes('youtu.be/')) {
+          socialUrls.youtube = url;
+        }
+      };
+
+      if (contact.website) {
+        inspectUrl(contact.website);
+      }
+
+      for (const pr of linkedResponses) {
+        if (pr.data?.publicProfiles && Array.isArray(pr.data.publicProfiles)) {
+          for (const p of pr.data.publicProfiles) {
+            inspectUrl(p.url);
+          }
+        }
+        if (pr.data?.publicWebsite) {
+          inspectUrl(pr.data.publicWebsite);
+        }
+      }
+
+      if (socialUrls.instagram || socialUrls.facebook || socialUrls.youtube) {
+        logger.info(`[DiscoveryPipeline] ScrapeCreators identifiers found: ${JSON.stringify(socialUrls)}. Invoking ScrapeCreators.`);
+        try {
+          const scCandidates = await scrapeCreatorsProvider.enrichProfile(socialUrls);
+          if (scCandidates && scCandidates.length > 0) {
+            logger.info(`[DiscoveryPipeline] ScrapeCreators enrichment returned ${scCandidates.length} profiles. Injecting into merge pipeline.`);
+            for (const cand of scCandidates) {
+              linkedResponses.push({
+                sourceName: cand.source,
+                confidence: cand.sourceConfidence,
+                data: cand
+              });
+            }
+          }
+        } catch (scErr: any) {
+          logger.error(`[DiscoveryPipeline] ScrapeCreators enrichment failed (gracefully skipped): ${scErr.message}`);
         }
       }
     }
