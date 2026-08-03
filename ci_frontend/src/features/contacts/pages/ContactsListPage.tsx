@@ -187,14 +187,14 @@ export const ContactsListPage: React.FC = () => {
 
       {/* Main List canvas */}
       {isLoading ? (
-        <div className="bg-white border border-slate-100 rounded-xl shadow-xs overflow-hidden flex flex-col animate-fade-in">
+        <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden flex flex-col animate-fade-in">
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-xs">
-              <thead className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50 border-b border-slate-100">
+              <thead className="text-[10px] font-bold text-slate-400 G-wide bg-slate-50/50 border-b border-slate-100 uppercase tracking-wider">
                 <tr>
                   <th className="py-4 px-6">Profile Card</th>
                   <th className="py-4 px-6 hidden sm:table-cell">Source</th>
-                  <th className="py-4 px-6">DM Score</th>
+                  <th className="py-4 px-6">Confidence Score</th>
                   <th className="py-4 px-6 hidden md:table-cell">Enrichment</th>
                   <th className="py-4 px-6 text-right">Actions</th>
                 </tr>
@@ -205,12 +205,12 @@ export const ContactsListPage: React.FC = () => {
                     <td className="py-4 px-6 flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-slate-100 animate-pulse shrink-0" />
                       <div className="space-y-2 flex-1">
-                        <div className="h-3.5 w-32 bg-slate-200 rounded animate-pulse" />
-                        <div className="h-3 w-48 bg-slate-100 rounded animate-pulse" />
+                        <div className="h-3 w-32 bg-slate-200 rounded animate-pulse" />
+                        <div className="h-2.5 w-48 bg-slate-100 rounded animate-pulse" />
                       </div>
                     </td>
                     <td className="py-4 px-6 hidden sm:table-cell">
-                      <div className="h-5 w-16 bg-slate-100 rounded animate-pulse" />
+                      <div className="h-5 w-16 bg-slate-100 rounded-full animate-pulse" />
                     </td>
                     <td className="py-4 px-6">
                       <div className="h-5 w-20 bg-slate-100 rounded-full animate-pulse" />
@@ -228,29 +228,29 @@ export const ContactsListPage: React.FC = () => {
           </div>
         </div>
       ) : isError ? (
-        <div className="bg-white border border-slate-100 rounded-xl p-12 flex flex-col items-center justify-center text-center shadow-xs">
-          <AlertCircle className="h-10 w-10 text-rose-500 mb-3" />
-          <h3 className="text-lg font-bold text-slate-800 mb-1">Could not fetch contacts</h3>
+        <div className="bg-white border border-slate-100 rounded-2xl p-12 flex flex-col items-center justify-center text-center shadow-sm">
+          <AlertCircle className="h-10 w-10 text-rose-550 mb-3" />
+          <h3 className="text-sm font-bold text-slate-800 mb-1">Could not fetch contacts</h3>
           <p className="text-xs text-slate-500 mb-6">Verify your backend local server connection.</p>
-          <Button onClick={() => refetch()} variant="outline" className="text-xs">
+          <Button onClick={() => refetch()} variant="outline" className="text-xs py-1.5 px-3">
             Try Again
           </Button>
         </div>
       ) : data?.contacts && data.contacts.length > 0 ? (
-        <div className="bg-white border border-slate-100 rounded-xl shadow-xs overflow-hidden flex flex-col animate-fade-in">
+        <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden flex flex-col animate-fade-in">
           {/* Table */}
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto font-sans">
             <table className="min-w-full text-left text-xs text-slate-500">
-              <thead className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50 border-b border-slate-100">
+              <thead className="text-[10px] font-bold text-slate-400 bg-slate-50/50 border-b border-slate-100 uppercase tracking-wider">
                 <tr>
-                  <th className="py-3 px-6">Profile Card</th>
-                  <th className="py-3 px-6 hidden sm:table-cell">Source</th>
-                  <th className="py-3 px-6">DM Score</th>
-                  <th className="py-3 px-6 hidden md:table-cell">Enrichment</th>
-                  <th className="py-3 px-6 text-right">Actions</th>
+                  <th className="py-4 px-6">Profile Card</th>
+                  <th className="py-4 px-6 hidden sm:table-cell">Source</th>
+                  <th className="py-4 px-6">Confidence Score</th>
+                  <th className="py-4 px-6 hidden md:table-cell">Enrichment</th>
+                  <th className="py-4 px-6 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 font-semibold text-slate-800">
+              <tbody className="divide-y divide-slate-55 font-semibold text-slate-800">
                 {data.contacts.map((contact, idx) => {
                   const initials = contact.name
                     .split(/\s+/)
@@ -262,31 +262,30 @@ export const ContactsListPage: React.FC = () => {
                   const score = contact.decisionMakerScore;
                   const pillColor =
                     score >= 80
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100/80'
                       : score >= 50
-                      ? 'bg-amber-50 text-amber-700 border-amber-100'
-                      : 'bg-slate-100 text-slate-600 border-slate-200';
+                      ? 'bg-amber-50 text-amber-700 border-amber-100/80'
+                      : 'bg-slate-100 text-slate-600 border-slate-200/80';
 
                   const enrichmentStatus = contact.professionalProfile?.enrichmentStatus || 'PENDING';
 
                   return (
                     <tr
                       key={contact.id}
-                      className="hover:bg-slate-50/30 transition-all duration-200 cursor-pointer animate-slide-up opacity-0"
-                      style={{ animationDelay: `${idx * 40}ms`, animationFillMode: 'forwards' }}
+                      className="hover:bg-slate-50/30 transition-colors cursor-pointer group"
                       onClick={() => navigate(`/contacts/${contact.id}`)}
                     >
                       {/* Name/Avatar block */}
                       <td className="py-4 px-6 flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-650 flex items-center justify-center font-bold text-xs tracking-wide shrink-0 transition-transform duration-200 group-hover:scale-105">
+                        <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-50 to-purple-50 border border-indigo-100/80 text-indigo-650 flex items-center justify-center font-black text-xs tracking-wide shrink-0 transition-transform duration-200 group-hover:scale-105">
                           {initials || <User className="h-4 w-4" />}
                         </div>
                         <div className="overflow-hidden">
-                          <p className="font-bold text-slate-900 truncate leading-snug hover:text-indigo-600 transition-colors">
+                          <p className="font-bold text-slate-900 truncate leading-snug group-hover:text-indigo-600 transition-colors">
                             {contact.name}
                           </p>
-                          <p className="text-[11px] text-slate-400 font-semibold truncate leading-none mt-1 flex items-center gap-1">
-                            <Briefcase className="h-3 w-3 shrink-0" />
+                          <p className="text-[11px] text-slate-400 font-semibold truncate leading-none mt-1.5 flex items-center gap-1">
+                            <Briefcase className="h-3.5 w-3.5 text-slate-450 shrink-0" />
                             {contact.designation || 'No title'} {contact.company ? `@ ${contact.company}` : ''}
                           </p>
                         </div>
@@ -294,7 +293,7 @@ export const ContactsListPage: React.FC = () => {
 
                       {/* Source badge */}
                       <td className="py-4 px-6 hidden sm:table-cell">
-                        <span className="inline-flex px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold uppercase border border-slate-200">
+                        <span className="inline-flex px-2.5 py-0.5 bg-slate-50 text-slate-600 rounded-full text-[9px] font-extrabold uppercase border border-slate-150">
                           {contact.source.replace('_', ' ')}
                         </span>
                       </td>
@@ -302,7 +301,7 @@ export const ContactsListPage: React.FC = () => {
                       {/* Score Badge */}
                       <td className="py-4 px-6">
                         <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${pillColor}`}>
-                          Score: {score}
+                          {score}% Verified
                         </span>
                       </td>
 
@@ -316,8 +315,8 @@ export const ContactsListPage: React.FC = () => {
                             </>
                           ) : (
                             <>
-                              <Clock className="h-4 w-4 text-slate-400 animate-pulse" />
-                              <span className="text-[11px] font-semibold text-slate-400">Pending</span>
+                              <Clock className="h-4 w-4 text-slate-400 animate-pulse-soft" />
+                              <span className="text-[11px] font-semibold text-slate-450">Pending</span>
                             </>
                           )}
                         </div>
@@ -325,13 +324,13 @@ export const ContactsListPage: React.FC = () => {
 
                       {/* Row Actions */}
                       <td className="py-4 px-6 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => {
                               setEditingContact(contact);
                               setIsFormOpen(true);
                             }}
-                            className="p-1.5 hover:bg-slate-50 text-slate-400 hover:text-indigo-600 rounded-lg outline-none transition-colors"
+                            className="p-1.5 hover:bg-white border border-transparent hover:border-slate-100 text-slate-450 hover:text-indigo-600 rounded-lg outline-none transition-colors"
                             title="Edit Profile"
                           >
                             <Edit2 className="h-4 w-4" />
@@ -341,7 +340,7 @@ export const ContactsListPage: React.FC = () => {
                               setDeletingContactId(contact.id);
                               setIsDeleteOpen(true);
                             }}
-                            className="p-1.5 hover:bg-slate-50 text-slate-400 hover:text-rose-600 rounded-lg outline-none transition-colors"
+                            className="p-1.5 hover:bg-white border border-transparent hover:border-slate-100 text-slate-450 hover:text-rose-600 rounded-lg outline-none transition-colors"
                             title="Delete Contact"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -356,8 +355,8 @@ export const ContactsListPage: React.FC = () => {
           </div>
 
           {/* Pagination Footer */}
-          <div className="h-14 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between px-6 shrink-0">
-            <span className="text-xs font-semibold text-slate-500">
+          <div className="h-14 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between px-6 shrink-0 font-sans">
+            <span className="text-xs font-semibold text-slate-450">
               Page {page} of {data.pagination.totalPages || 1} ({data.pagination.total} total)
             </span>
 
@@ -384,14 +383,14 @@ export const ContactsListPage: React.FC = () => {
                 <button
                   onClick={() => handlePageChange(page - 1)}
                   disabled={page === 1}
-                  className="p-1.5 border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 rounded-lg outline-none transition-all"
+                  className="p-1.5 border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 rounded-lg outline-none transition-all"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => handlePageChange(page + 1)}
                   disabled={page === data.pagination.totalPages}
-                  className="p-1.5 border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 rounded-lg outline-none transition-all"
+                  className="p-1.5 border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 rounded-lg outline-none transition-all"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>
@@ -401,11 +400,11 @@ export const ContactsListPage: React.FC = () => {
         </div>
       ) : (
         /* Empty State */
-        <div className="bg-white border border-slate-100 rounded-xl p-16 flex flex-col items-center justify-center text-center shadow-xs">
+        <div className="bg-white border border-slate-100 rounded-2xl p-16 flex flex-col items-center justify-center text-center shadow-sm">
           <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-full mb-4 inline-flex items-center justify-center">
-            <User className="h-10 w-10 text-indigo-600" />
+            <User className="h-10 w-10 text-indigo-650" />
           </div>
-          <h3 className="text-lg font-bold text-slate-800 mb-1">No contacts found</h3>
+          <h3 className="text-sm font-bold text-slate-800 mb-1">No contacts found</h3>
           <p className="text-xs text-slate-500 mb-6 max-w-xs leading-relaxed">
             Create a contact manually, upload a business card, scan a QR code, or read an NFC tag to populate your directory.
           </p>
@@ -438,6 +437,7 @@ export const ContactsListPage: React.FC = () => {
         title="Delete Contact"
         message="Are you sure you want to delete this contact? This will delete all associated cards, notes, and activity histories."
         confirmText="Delete"
+        confirmButtonClass="bg-rose-600 hover:bg-rose-700 text-white"
         variant="danger"
         isLoading={deleteMutation.isPending}
       />

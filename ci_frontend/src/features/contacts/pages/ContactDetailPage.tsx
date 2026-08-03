@@ -493,38 +493,67 @@ export const ContactDetailPage: React.FC = () => {
       </div>
 
       {/* Header Profile summary card */}
-      <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
-        <div className="flex items-center gap-4">
-          <div className="h-14 w-14 rounded-full bg-indigo-50 border-2 border-indigo-100 text-indigo-650 flex items-center justify-center font-bold text-xl tracking-wide shrink-0 shadow-sm">
+      <div className="bg-white p-6 border border-slate-100 rounded-2xl shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-indigo-50/5 to-transparent pointer-events-none" />
+        
+        <div className="flex items-center gap-4 relative z-10">
+          <div className="h-16 w-16 rounded-2xl bg-gradient-to-tr from-indigo-100 to-purple-100 border border-indigo-200/60 text-indigo-700 flex items-center justify-center font-black text-xl tracking-wide shrink-0 shadow-xs relative">
+            <span className="absolute -top-1 -right-1 h-3.5 w-3.5 bg-emerald-500 border-2 border-white rounded-full" title="Active Contact" />
             {initials}
           </div>
           <div className="overflow-hidden">
-            <h1 className="text-xl font-extrabold text-slate-900 leading-tight truncate">{contact.name}</h1>
-            <p className="text-xs text-slate-400 mt-1 flex items-center gap-1 font-semibold">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-black text-slate-900 leading-tight truncate">{contact.name}</h1>
+              {verificationStatus && (
+                <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-100/60 text-[9px] font-extrabold rounded-full select-none">
+                  {verificationStatus}
+                </span>
+              )}
+            </div>
+            
+            <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-1.5 font-semibold">
               <Briefcase className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-              {contact.designation || 'No title'} {contact.company ? `@ ${contact.company}` : ''}
+              <span>{contact.designation || 'No title'} {contact.company ? `@ ${contact.company}` : ''}</span>
             </p>
+
+            {/* Platform Quick Links */}
+            <div className="flex items-center gap-2 mt-2">
+              {contact.website && (
+                <a
+                  href={contact.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2 py-1 bg-slate-50 border border-slate-150 hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded-md text-[10px] font-bold inline-flex items-center gap-1 transition-colors"
+                >
+                  <Globe className="h-3 w-3" /> Website
+                </a>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <span className={`inline-flex px-3 py-1 rounded-full text-xs font-extrabold border select-none ${scoreBg}`}>
-            Decision Score: {score}
-          </span>
+        <div className="flex flex-wrap items-center gap-3 relative z-10">
+          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-black border select-none ${scoreBg} shadow-xs`}>
+            <span>Decision Score:</span>
+            <span className="font-mono text-sm bg-white/70 px-1.5 py-0.2 rounded-md border border-slate-200/50">{score}%</span>
+          </div>
+          
           {isPipelineActive && (
-            <span className="inline-flex px-3 py-1 rounded-full text-[10px] font-extrabold border bg-blue-50 text-blue-700 border-blue-200 animate-pulse uppercase">
+            <span className="inline-flex px-2.5 py-1.5 rounded-xl text-[9px] font-black border bg-blue-50 text-blue-700 border-blue-200 animate-pulse uppercase tracking-wider">
               {enrichmentStatus.replace('_', ' ')}...
             </span>
           )}
+          
           <Button
             onClick={handleTriggerEnrichment}
             isLoading={enrichMutation.isPending || isPipelineActive}
-            className="flex items-center gap-1.5 py-1.5 px-3.5 text-xs shadow-sm shadow-indigo-600/10 font-bold"
+            className="flex items-center gap-1.5 py-2 px-4 text-xs shadow-xs font-bold bg-indigo-650 hover:bg-indigo-700 text-white cursor-pointer"
           >
             <Cpu className="h-4 w-4" /> Refresh Enrichment
           </Button>
         </div>
       </div>
+
 
       {/* Duplicates Alert banner */}
       {duplicates && duplicates.length > 0 && (

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { useUIStore } from '../store/useUIStore';
@@ -14,6 +14,19 @@ import {
   Menu,
   X,
   ShieldCheck,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Bell,
+  Sun,
+  Moon,
+  Plus,
+  Settings,
+  HelpCircle,
+  Sparkles,
+  Eye,
+  Activity,
+  History
 } from 'lucide-react';
 
 export const DashboardLayout: React.FC = () => {
@@ -21,7 +34,13 @@ export const DashboardLayout: React.FC = () => {
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
   const addToast = useToastStore((state) => state.addToast);
-  const { isSidebarOpen, toggleSidebar, setSidebarOpen } = useUIStore();
+  const { isSidebarOpen, toggleSidebar, setSidebarOpen, themeMode, setThemeMode } = useUIStore();
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  
+  // Custom states for Settings and Help dialog overlays
+  const [showSettings, setShowSettings] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -30,95 +49,198 @@ export const DashboardLayout: React.FC = () => {
   };
 
   const navItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard className="h-5 w-5" /> },
-    { name: 'Contacts', path: '/contacts', icon: <Users className="h-5 w-5" /> },
-    { name: 'Card Scanner', path: '/scanner', icon: <ScanLine className="h-5 w-5" /> },
-    { name: 'QR Code', path: '/qr', icon: <QrCode className="h-5 w-5" /> },
-    { name: 'NFC Reader', path: '/nfc', icon: <Nfc className="h-5 w-5" /> },
-    { name: 'Face Match', path: '/face', icon: <UserCheck className="h-5 w-5" /> },
-    { name: 'Face History', path: '/face-history', icon: <ScanLine className="h-5 w-5" /> },
+    { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard className="h-4.5 w-4.5" /> },
+    { name: 'Contacts', path: '/contacts', icon: <Users className="h-4.5 w-4.5" /> },
+    { name: 'Business Cards', path: '/scanner', icon: <ScanLine className="h-4.5 w-4.5" /> },
+    { name: 'QR Scanner', path: '/qr', icon: <QrCode className="h-4.5 w-4.5" /> },
+    { name: 'NFC Reader', path: '/nfc', icon: <Nfc className="h-4.5 w-4.5" /> },
+    { name: 'Face Recognition', path: '/face', icon: <UserCheck className="h-4.5 w-4.5" /> },
+    { name: 'Face History', path: '/face-history', icon: <History className="h-4.5 w-4.5" /> },
+    { name: 'AI Intelligence', path: '/contacts', icon: <Sparkles className="h-4.5 w-4.5" />, badge: 'AI' },
+    { name: 'Profile Discovery', path: '/contacts', icon: <Eye className="h-4.5 w-4.5" /> },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50/50 bg-dot-grid-light flex flex-col md:flex-row relative">
-      {/* Mobile Header */}
-      <header className="md:hidden w-full h-16 bg-white/80 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-4 z-40 shrink-0">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-6 w-6 text-indigo-650 animate-pulse" />
-          <span className="font-extrabold text-slate-800 text-base tracking-tight">Contact Intelligence</span>
+    <div className="min-h-screen bg-slate-50/50 bg-dot-grid-light flex flex-col md:flex-row relative font-sans">
+      
+      {/* Top Navbar - Fixed */}
+      <header className="fixed top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-md border-b border-slate-100/80 flex items-center justify-between px-4 z-40 shrink-0 shadow-xs">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggleSidebar}
+            className="md:hidden p-1.5 hover:bg-slate-50 text-slate-500 rounded-lg outline-none cursor-pointer"
+          >
+            {isSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+          
+          <div className="flex items-center gap-2">
+            <div className="h-9 w-9 bg-gradient-to-tr from-indigo-500 to-purple-650 rounded-xl flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+              <ShieldCheck className="h-5 w-5 animate-pulse-soft" />
+            </div>
+            <span className="font-extrabold text-slate-900 text-base tracking-tight hidden sm:inline-block">
+              CI <span className="bg-gradient-to-r from-indigo-650 to-purple-650 bg-clip-text text-transparent">Intelligence</span>
+            </span>
+          </div>
+
+          <div className="h-4 w-px bg-slate-100 hidden md:block" />
+
+          {/* Activity Glow indicator */}
+          <div className="hidden md:flex items-center gap-2 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100 text-[10px] font-bold">
+            <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-ping" />
+            <span>OSINT Engine Active</span>
+          </div>
         </div>
-        <button
-          onClick={toggleSidebar}
-          className="p-1.5 hover:bg-slate-50 text-slate-550 rounded-lg outline-none cursor-pointer"
-        >
-          {isSidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </button>
+
+        {/* Search and Navigation Tools */}
+        <div className="flex items-center gap-4">
+          
+          {/* Global Search Bar */}
+          <div className="relative hidden md:block w-64 lg:w-80">
+            <input
+              type="text"
+              placeholder="Search contacts globally..."
+              onFocus={() => navigate('/contacts')}
+              className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-150 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50/50 rounded-lg text-xs outline-none transition-all duration-200"
+            />
+            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+          </div>
+
+          {/* Quick Actions Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowQuickActions(!showQuickActions)}
+              className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Actions</span>
+            </button>
+            
+            {showQuickActions && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowQuickActions(false)} />
+                <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-100 rounded-xl shadow-lg py-1.5 z-50 animate-slide-down">
+                  <button
+                    onClick={() => { setShowQuickActions(false); navigate('/scanner'); }}
+                    className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                  >
+                    <ScanLine className="h-3.5 w-3.5 text-slate-400" /> Scan Business Card
+                  </button>
+                  <button
+                    onClick={() => { setShowQuickActions(false); navigate('/qr'); }}
+                    className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                  >
+                    <QrCode className="h-3.5 w-3.5 text-slate-400" /> Scan QR Code
+                  </button>
+                  <button
+                    onClick={() => { setShowQuickActions(false); navigate('/nfc'); }}
+                    className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                  >
+                    <Nfc className="h-3.5 w-3.5 text-slate-400" /> Read NFC Card
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Dark Mode toggle placeholder */}
+          <button
+            onClick={() => setThemeMode(themeMode === 'light' ? 'dark' : 'light')}
+            className="p-1.5 hover:bg-slate-50 text-slate-500 rounded-lg outline-none cursor-pointer transition-colors"
+            title="Toggle theme (visual representation)"
+          >
+            {themeMode === 'dark' ? <Sun className="h-4.5 w-4.5 text-amber-500" /> : <Moon className="h-4.5 w-4.5" />}
+          </button>
+
+          {/* Notification bell with count badge */}
+          <button className="p-1.5 hover:bg-slate-50 text-slate-550 rounded-lg relative outline-none cursor-pointer">
+            <Bell className="h-4.5 w-4.5" />
+            <span className="absolute top-1 right-1 h-2 w-2 bg-indigo-500 rounded-full border border-white animate-pulse" />
+          </button>
+
+          {/* User profile dropdown and metadata */}
+          <div className="flex items-center gap-2 border-l border-slate-100 pl-3">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-indigo-500/10 to-purple-500/10 border border-indigo-100 text-indigo-650 flex items-center justify-center font-extrabold text-xs tracking-wide shrink-0">
+              {(user?.fullName || user?.name || 'U').substring(0, 2).toUpperCase()}
+            </div>
+          </div>
+        </div>
       </header>
 
-      {/* Sidebar Navigation */}
+      {/* Sidebar Navigation - Left */}
       <aside
-        className={`fixed inset-y-0 left-0 md:sticky md:top-0 h-screen w-64 bg-zinc-950 text-zinc-400 z-50 flex flex-col shrink-0 border-r border-zinc-900 transition-transform duration-250 md:transform-none
-          ${isSidebarOpen ? 'transform-none' : '-translate-x-full'}`}
+        className={`fixed inset-y-0 left-0 pt-16 md:sticky md:top-16 h-[calc(100vh-4rem)] md:h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-400 z-30 flex flex-col shrink-0 border-r border-zinc-900 transition-all duration-250
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+          ${isCollapsed ? 'w-20' : 'w-64'}`}
       >
-        {/* Sidebar Header */}
-        <div className="h-16 flex items-center justify-between px-6 border-b border-zinc-900">
-          <div className="flex items-center gap-2.5">
-            <ShieldCheck className="h-6 w-6 text-indigo-400" />
-            <span className="font-extrabold text-white text-base tracking-tight">Contact Intelligence</span>
-          </div>
+        {/* Toggle Collapse bar for sidebar - desktop only */}
+        <div className="hidden md:flex justify-end px-3 py-2 border-b border-zinc-900">
           <button
-            onClick={() => setSidebarOpen(false)}
-            className="md:hidden p-1 text-zinc-400 hover:text-white rounded-lg outline-none cursor-pointer"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="p-1 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 rounded-md cursor-pointer outline-none transition-colors"
           >
-            <X className="h-5 w-5" />
+            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </button>
         </div>
 
         {/* Sidebar Nav Links */}
-        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => (
             <NavLink
               key={item.name}
               to={item.path}
               onClick={() => setSidebarOpen(false)}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 text-sm font-semibold rounded-lg transition-all duration-200 group border
+                `flex items-center gap-3 px-3 py-2.5 text-xs font-semibold rounded-lg transition-all duration-200 group border
+                ${isCollapsed ? 'justify-center' : ''}
                 ${
                   isActive
-                    ? 'bg-indigo-600/15 border-indigo-500/25 text-indigo-400 font-bold shadow-sm'
+                    ? 'bg-indigo-600/15 border-indigo-500/25 text-indigo-400 font-bold shadow-xs'
                     : 'bg-transparent border-transparent hover:bg-zinc-900/60 hover:text-zinc-200 hover:border-zinc-900'
                 }`
               }
+              title={isCollapsed ? item.name : undefined}
             >
               {item.icon}
-              {item.name}
+              {!isCollapsed && (
+                <span className="flex-1 truncate">{item.name}</span>
+              )}
+              {!isCollapsed && item.badge && (
+                <span className="px-1.5 py-0.2 bg-indigo-500/20 text-indigo-300 text-[9px] font-bold rounded">
+                  {item.badge}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>
 
-        {/* Sidebar Footer (User Info & Logout) */}
-        <div className="p-4 border-t border-zinc-900 bg-zinc-900/20">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-3 px-2">
-              <div className="h-9 w-9 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-indigo-400 flex items-center justify-center font-extrabold text-sm tracking-wide shrink-0">
-                {(user?.fullName || user?.name || 'U').substring(0, 2).toUpperCase()}
-              </div>
-              <div className="overflow-hidden">
-                <p className="text-xs font-bold text-zinc-200 truncate leading-none mb-1">
-                  {user?.fullName || user?.name || 'Platform User'}
-                </p>
-                <p className="text-[10px] text-zinc-500 truncate leading-none">
-                  {user?.email || 'user@enterprise.com'}
-                </p>
-              </div>
-            </div>
+        {/* Sidebar Footer actions */}
+        <div className="p-3 border-t border-zinc-900 bg-zinc-900/20">
+          <div className="flex flex-col gap-1.5">
+            <button
+              onClick={() => setShowSettings(true)}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 rounded-lg transition-colors cursor-pointer
+                ${isCollapsed ? 'justify-center' : ''}`}
+            >
+              <Settings className="h-4.5 w-4.5 text-zinc-500" />
+              {!isCollapsed && <span>Settings</span>}
+            </button>
+            
+            <button
+              onClick={() => setShowHelp(true)}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 rounded-lg transition-colors cursor-pointer
+                ${isCollapsed ? 'justify-center' : ''}`}
+            >
+              <HelpCircle className="h-4.5 w-4.5 text-zinc-500" />
+              {!isCollapsed && <span>Help Center</span>}
+            </button>
 
             <button
               onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold text-rose-400 hover:bg-rose-500/10 hover:text-rose-350 rounded-lg transition-all cursor-pointer"
+              className={`w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-rose-400 hover:bg-rose-500/10 hover:text-rose-350 rounded-lg transition-all cursor-pointer mt-2
+                ${isCollapsed ? 'justify-center' : ''}`}
             >
-              <LogOut className="h-4 w-4" />
-              Sign Out
+              <LogOut className="h-4.5 w-4.5" />
+              {!isCollapsed && <span>Sign Out</span>}
             </button>
           </div>
         </div>
@@ -128,16 +250,77 @@ export const DashboardLayout: React.FC = () => {
       {isSidebarOpen && (
         <div
           onClick={() => setSidebarOpen(false)}
-          className="md:hidden fixed inset-0 bg-zinc-950/60 backdrop-blur-xs z-45 transition-opacity"
+          className="md:hidden fixed inset-0 bg-zinc-950/60 backdrop-blur-xs z-20 transition-opacity"
         />
       )}
 
       {/* Primary Layout Main Canvas */}
-      <main className="flex-1 flex flex-col min-w-0 h-[calc(100vh-4rem)] md:h-screen overflow-y-auto">
+      <main className="flex-1 flex flex-col min-w-0 pt-16 h-screen overflow-y-auto">
         <div className="p-4 md:p-8 max-w-7xl w-full mx-auto flex-1 flex flex-col animate-fade-in">
           <Outlet />
         </div>
       </main>
+
+      {/* Settings Dialog Overlay */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/40 backdrop-blur-xs">
+          <div className="bg-white border border-slate-100 rounded-2xl shadow-xl w-full max-w-md p-6 animate-slide-up">
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-2">
+              <Settings className="h-4.5 w-4.5 text-indigo-500" /> Platform Settings
+            </h3>
+            <p className="text-xs text-slate-500 mb-6">
+              Configure reverse face matching weights, SerpApi credentials, and Tavily search rates.
+            </p>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-50 pb-2.5">
+                <span className="text-xs font-bold text-slate-700">Cache Bypass</span>
+                <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold border border-emerald-100">Enabled</span>
+              </div>
+              <div className="flex items-center justify-between border-b border-slate-50 pb-2.5">
+                <span className="text-xs font-bold text-slate-700">Cosine Threshold</span>
+                <span className="font-mono text-xs text-slate-500">0.20</span>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowSettings(false)}
+                className="bg-indigo-650 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Help Dialog Overlay */}
+      {showHelp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/40 backdrop-blur-xs">
+          <div className="bg-white border border-slate-100 rounded-2xl shadow-xl w-full max-w-md p-6 animate-slide-up">
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-2">
+              <HelpCircle className="h-4.5 w-4.5 text-indigo-500" /> Help Center & Guides
+            </h3>
+            <p className="text-xs text-slate-500 mb-6">
+              Learn how to ingest contacts using Card scanning, QR Codes, NFC, and biometric face match.
+            </p>
+            <div className="space-y-3 font-semibold text-xs text-slate-700">
+              <p>• <b>Card Scanner:</b> Upload photos of business cards to extract fields using local OCR.</p>
+              <p>• <b>Face Recognition:</b> Enroll contact photos and perform reverse face searches to locate LinkedIn profiles.</p>
+              <p>• <b>Identity Resolution:</b> Engine merges OSINT fields using 15 identity signals.</p>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowHelp(false)}
+                className="bg-indigo-650 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold cursor-pointer"
+              >
+                Got It
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
+
