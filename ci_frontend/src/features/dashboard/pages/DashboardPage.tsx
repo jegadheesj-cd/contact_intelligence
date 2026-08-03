@@ -155,7 +155,7 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* Metrics Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
         {/* Total Contacts */}
         <button 
           onClick={() => navigate('/contacts')}
@@ -174,68 +174,8 @@ export const DashboardPage: React.FC = () => {
           </div>
         </button>
 
-        {/* Verification Success Rate */}
-        <div className="bg-white p-5 border border-slate-100/80 hover:shadow-md rounded-xl shadow-xs flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 animate-fade-in delay-75">
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
-              Verified Contacts
-            </span>
-            <h3 className="text-2xl font-extrabold text-slate-900 mt-2">
-              <CountUp end={widgets?.verificationRate || 0} suffix="%" />
-            </h3>
-          </div>
-          <div className="p-2.5 bg-violet-50 border border-violet-100 rounded-lg text-violet-650">
-            <UserCheck className="h-5 w-5" />
-          </div>
-        </div>
-
-        {/* AI Summary Coverage */}
-        <div className="bg-white p-5 border border-slate-100/80 hover:shadow-md rounded-xl shadow-xs flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 animate-fade-in delay-100">
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
-              AI Summary Coverage
-            </span>
-            <h3 className="text-2xl font-extrabold text-slate-900 mt-2">
-              <CountUp end={widgets?.aiSummaryCoverage || 0} suffix="%" />
-            </h3>
-          </div>
-          <div className="p-2.5 bg-purple-50 border border-purple-100 rounded-lg text-purple-650">
-            <Activity className="h-5 w-5" />
-          </div>
-        </div>
-
-        {/* OCR Success Rate */}
-        <div className="bg-white p-5 border border-slate-100/80 hover:shadow-md rounded-xl shadow-xs flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 animate-fade-in delay-150">
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
-              OCR Success Rate
-            </span>
-            <h3 className="text-2xl font-extrabold text-slate-900 mt-2">
-              <CountUp end={ocrRate} suffix="%" />
-            </h3>
-          </div>
-          <div className="p-2.5 bg-emerald-50 border border-emerald-100 rounded-lg text-emerald-655">
-            <Zap className="h-5 w-5" />
-          </div>
-        </div>
-
-        {/* Face Recognition similarity */}
-        <div className="bg-white p-5 border border-slate-100/80 hover:shadow-md rounded-xl shadow-xs flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 animate-fade-in delay-200">
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
-              Face Similarity
-            </span>
-            <h3 className="text-2xl font-extrabold text-slate-900 mt-2">
-              <CountUp end={matchAccuracy * 100} suffix="%" />
-            </h3>
-          </div>
-          <div className="p-2.5 bg-sky-50 border border-sky-100 rounded-lg text-sky-655">
-            <UserCheck className="h-5 w-5" />
-          </div>
-        </div>
-
         {/* Average Processing time */}
-        <div className="bg-white p-5 border border-slate-100/80 hover:shadow-md rounded-xl shadow-xs flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 animate-fade-in delay-300">
+        <div className="bg-white p-5 border border-slate-100/80 hover:shadow-md rounded-xl shadow-xs flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 animate-fade-in delay-75">
           <div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
               Avg OCR Speed
@@ -346,47 +286,6 @@ export const DashboardPage: React.FC = () => {
             </div>
           )}
 
-          {/* Top Companies */}
-          <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs">
-            <h2 className="text-xs font-bold text-slate-700 tracking-wider uppercase mb-4 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-indigo-500" /> Top Companies
-            </h2>
-            {widgets?.commonCompanies && widgets.commonCompanies.length > 0 ? (
-              <div className="space-y-2">
-                {widgets.commonCompanies.map((c) => (
-                  <div key={c.company} className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-700">{c.company}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">
-                      {c.count} {c.count === 1 ? 'contact' : 'contacts'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-slate-400">No company details aggregated yet.</p>
-            )}
-          </div>
-
-          {/* Top Industries */}
-          <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs">
-            <h2 className="text-xs font-bold text-slate-700 tracking-wider uppercase mb-4">
-              Top Industries
-            </h2>
-            {widgets?.commonIndustries && widgets.commonIndustries.length > 0 ? (
-              <div className="space-y-2">
-                {widgets.commonIndustries.map((ind) => (
-                  <div key={ind.industry} className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-700">{ind.industry}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">
-                      {ind.count}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-slate-400">No industry details aggregated yet.</p>
-            )}
-          </div>
         </div>
 
         {/* Right Column: Recent Uploads & Enriched Profiles */}
@@ -448,29 +347,6 @@ export const DashboardPage: React.FC = () => {
             )}
           </div>
 
-          {/* Top Skills Cloud */}
-          <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs">
-            <h2 className="text-xs font-bold text-slate-700 tracking-wider uppercase mb-4">
-              Top Skills
-            </h2>
-            {widgets?.commonSkills && widgets.commonSkills.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {widgets.commonSkills.map((sk) => (
-                  <span
-                    key={sk.skill}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg text-xs font-bold"
-                  >
-                    {sk.skill}
-                    <span className="text-[10px] bg-indigo-100 text-indigo-800 px-1 rounded-full">
-                      {sk.count}
-                    </span>
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-slate-400">No skills aggregated yet.</p>
-            )}
-          </div>
         </div>
       </div>
     </div>

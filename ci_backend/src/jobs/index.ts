@@ -15,6 +15,7 @@ import { validateAndCorrectContact, runGeminiOcrClassifier } from '../utils/vali
 import { ContactsService } from '../modules/contacts/contacts.service';
 import { FaceSearchProviderManager } from '../modules/face-recognition/providers/FaceSearchProviderManager';
 import { CandidateVerificationService } from '../modules/face-recognition/services/CandidateVerificationService';
+import { generateTextWithFallback } from '../utils/aiClient';
 
 const execFilePromise = promisify(execFile);
 const enrichmentService = new ProfileEnrichmentService();
@@ -486,10 +487,23 @@ export const faceRecognitionWorker = new Worker(
 
           // 4. Create/Update Contact with initial candidate data
           if (!contactId) {
+            let cleanName = bestCandidate.title || 'Unknown Face Match';
+            try {
+              const prompt = `Extract only the clean, full name of the person from this search result title. Do not include titles (like CEO, Founder), company names, video platforms (like YouTube), or descriptions. Return ONLY the name (e.g., Mark Zuckerberg).
+Title: "${cleanName}"
+Name:`;
+              const aiResponse = await generateTextWithFallback(prompt, { maxTokens: 20 });
+              if (aiResponse && aiResponse.trim().length > 0) {
+                cleanName = aiResponse.trim().replace(/^['"\s]+|['"\s]+$/g, '');
+              }
+            } catch (e: any) {
+              logger.warn(`Failed to clean name using AI: ${e.message}`);
+            }
+
             const newContact = await prisma.contact.create({
               data: {
                 userId,
-                name: bestCandidate.title || 'Unknown Face Match',
+                name: cleanName,
                 website: bestCandidate.url,
                 source: ContactSource.FACE_RECOGNITION,
               }

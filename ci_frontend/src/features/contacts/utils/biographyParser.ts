@@ -181,8 +181,8 @@ export function parseBiography(biographyText: string | null | undefined): Parsed
   const educationList: ParsedEducation[] = [];
 
   if (isMarkdownFormat) {
-    // Split by markdown main sections (##)
-    const sections = cleanedBio.split(/\s*##\s+/);
+    // Split by markdown main sections (##), ignoring ### subheadings
+    const sections = cleanedBio.split(/(?<!#)##(?!#)\s+/);
     
     for (const section of sections) {
       const trimmedSec = section.trim();
@@ -414,3 +414,85 @@ export function parseBiography(biographyText: string | null | undefined): Parsed
     education: cleanEdu
   };
 }
+
+export function formatGroundedBio(
+  bioText: string | null | undefined,
+  experienceList?: any[],
+  educationList?: any[],
+  currentTitle?: string | null,
+  currentCompany?: string | null
+): string {
+  if (!bioText) return '';
+  const cleaned = decodeHtmlEntities(bioText).trim();
+  if (!cleaned.includes('##') && !cleaned.includes('###')) {
+    return cleaned; // Return as is if it's already plain text (like a short summary)
+  }
+
+  const parsed = parseBiography(cleaned);
+
+  // Use fallback arrays if the parsed list is empty
+  const finalEdu = parsed.education.length > 0 ? parsed.education : (educationList || []);
+  let finalExp = parsed.experience.length > 0 ? parsed.experience : (experienceList || []);
+
+  // If experience is empty, build a fallback entry using the current job credentials if available
+  if (finalExp.length === 0 && (currentTitle || currentCompany)) {
+    finalExp = [{
+      title: currentTitle || 'Professional Role',
+      company: currentCompany || '',
+      period: 'Present'
+    }];
+  }
+
+  // Extract About/Summary if present
+  let aboutText = '';
+  const aboutMatch = cleaned.match(/##\s+About\s+([\s\S]*?)(##|$)/i);
+  if (aboutMatch && aboutMatch[1]) {
+    aboutText = aboutMatch[1].trim();
+  }
+
+  const lines: string[] = [];
+  if (aboutText) {
+    lines.push(`About: ${aboutText}\n`);
+  }
+
+  lines.push('Education:');
+  if (finalEdu && finalEdu.length > 0) {
+    finalEdu.forEach(edu => {
+      const parts = [
+        edu.school || edu.institution,
+        edu.degree,
+        edu.fieldOfStudy
+      ].filter(Boolean);
+      
+      const details = parts.join(' - ');
+      const period = edu.startYear && edu.endYear 
+        ? ` (${edu.startYear} - ${edu.endYear})` 
+        : edu.year 
+          ? ` (${edu.year})` 
+          : '';
+      lines.push(`- ${details}${period}`);
+    });
+  } else {
+    lines.push('- N/A');
+  }
+
+  lines.push('\nExperience:');
+  if (finalExp && finalExp.length > 0) {
+    finalExp.forEach(exp => {
+      const role = [
+        exp.title || exp.designation,
+        exp.company ? `at ${exp.company}` : ''
+      ].filter(Boolean).join(' ');
+      
+      const periodStr = exp.period || exp.duration || (exp.startYear && exp.endYear ? `${exp.startYear} - ${exp.endYear}` : '');
+      const period = periodStr ? ` (${periodStr})` : '';
+      const desc = exp.description ? ` - ${exp.description}` : '';
+      lines.push(`- ${role}${period}${desc}`);
+    });
+  } else {
+    lines.push('- N/A');
+  }
+
+  return lines.join('\n');
+}
+

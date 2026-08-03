@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { parseBiography } from '../utils/biographyParser';
+import { parseBiography, formatGroundedBio } from '../utils/biographyParser';
 import {
   useContact,
   useUpdateContact,
@@ -736,8 +736,8 @@ export const ContactDetailPage: React.FC = () => {
                   AI Grounded Bio
                 </h2>
                 {aiProfile?.summary || aiProfile?.companyBio ? (
-                  <p className="text-xs text-slate-650 leading-relaxed font-semibold border-l-2 border-indigo-250 pl-3.5 italic bg-slate-50/20 py-2 rounded-r-lg">
-                    "{aiProfile.summary || aiProfile.companyBio}"
+                  <p className="text-xs text-slate-650 leading-relaxed font-semibold border-l-2 border-indigo-250 pl-3.5 italic bg-slate-50/20 py-2 rounded-r-lg whitespace-pre-line" style={{ whiteSpace: 'pre-line' }}>
+                    {formatGroundedBio(aiProfile.summary || aiProfile.companyBio, experiencesToDisplay, educationToDisplay, contact.designation, contact.company)}
                   </p>
                 ) : (
                   <p className="text-xs text-slate-400 italic">No verified professional bio generated. Run profile enrichment to sync.</p>
@@ -1294,13 +1294,7 @@ export const ContactDetailPage: React.FC = () => {
                                 </div>
                               )}
 
-                              {cand.summary && (
-                                <div className="mt-3 bg-slate-50 p-2 rounded-lg border border-slate-100/50">
-                                  <p className="text-[10px] text-slate-600 line-clamp-3 leading-relaxed font-medium">
-                                    {cand.summary}
-                                  </p>
-                                </div>
-                              )}
+
                             </div>
 
                             <div className="mt-4 pt-3 border-t border-slate-100/60 flex items-center justify-between">
@@ -1639,11 +1633,19 @@ export const ContactDetailPage: React.FC = () => {
 
               {/* About candidate biography */}
               {(selectedCandidate.summary || selectedCandidate.companyBio) && (
-                <div className="space-y-2">
-                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Biography</h4>
-                  <p className="text-xs text-slate-700 leading-relaxed font-semibold bg-slate-50 p-4 border border-slate-100 rounded-xl">
-                    {selectedCandidate.summary || selectedCandidate.companyBio}
-                  </p>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Structured Biography</h4>
+                    <p className="text-xs text-slate-700 leading-relaxed font-semibold bg-slate-50 p-4 border border-slate-100 rounded-xl whitespace-pre-line" style={{ whiteSpace: 'pre-line' }}>
+                      {formatGroundedBio(selectedCandidate.summary || selectedCandidate.companyBio, selectedCandidate.experience, selectedCandidate.education, selectedCandidate.designation || selectedCandidate.headline || selectedCandidate.companyRole, selectedCandidate.company)}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Raw Biography Text</h4>
+                    <p className="text-xs text-slate-600 leading-relaxed font-medium bg-slate-50/50 p-4 border border-slate-100 rounded-xl">
+                      {selectedCandidate.summary || selectedCandidate.companyBio}
+                    </p>
+                  </div>
                 </div>
               )}
 

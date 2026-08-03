@@ -493,12 +493,32 @@ export class ProfileDiscoveryEngine {
     const lowerDesc = description.toLowerCase();
     const lowerSlug = url.split('/in/')[1]?.toLowerCase() || '';
 
+    // Clean suffix and extra title junk from signals.name for more robust matching
+    const cleanSignalsName = signals.name.toLowerCase()
+      .replace(/on\s+['"].*?['"]|ceo|discusses|facebook|meta|youtube|profile|video|title|yacht|this\s+week/gi, '')
+      .trim();
+
+    // Clean title for matching (extract the name portion, usually before any dashes/pipes)
+    const cleanTitle = title.toLowerCase()
+      .replace(/\s*(\||\-)?\s*LinkedIn/gi, '')
+      .split(/\s*[\-\–\—]\s*/)[0]
+      .trim();
+
     // Name Match
-    const nameSim = stringSimilarity(signals.name.toLowerCase(), lowerTitle);
-    if (nameSim > 0.5) score += 35;
-    const nameParts = signals.name.toLowerCase().split(/\s+/);
-    const slugMatches = nameParts.filter(part => lowerSlug.includes(part));
-    if (slugMatches.length === nameParts.length) score += 10;
+    const nameSim = stringSimilarity(cleanSignalsName, cleanTitle);
+    if (nameSim > 0.5 || cleanSignalsName.includes(cleanTitle) || cleanTitle.includes(cleanSignalsName)) {
+      score += 60; // Strong name match gets a baseline of 60
+    } else if (nameSim > 0.3) {
+      score += 35;
+    }
+
+    const nameParts = cleanSignalsName.split(/\s+/).filter(part => part.length >= 3);
+    if (nameParts.length > 0) {
+      const slugMatches = nameParts.filter(part => lowerSlug.includes(part));
+      if (slugMatches.length >= Math.min(2, nameParts.length)) {
+        score += 15; // Slug contains at least 2 key parts of the name
+      }
+    }
 
     // Company Match
     if (signals.company) {
