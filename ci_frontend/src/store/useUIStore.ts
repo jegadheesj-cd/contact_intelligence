@@ -19,14 +19,30 @@ interface UIState {
   deepIdentityScan: boolean;
   setDeepIdentityScan: (enabled: boolean) => void;
   
+  enableSoundAlerts: boolean;
+  setEnableSoundAlerts: (enabled: boolean) => void;
+
+  // Third-Party API Keys
   serpApiKey: string;
   setSerpApiKey: (key: string) => void;
   
   tavilyApiKey: string;
   setTavilyApiKey: (key: string) => void;
   
-  enableSoundAlerts: boolean;
-  setEnableSoundAlerts: (enabled: boolean) => void;
+  geminiApiKey: string;
+  setGeminiApiKey: (key: string) => void;
+  
+  groqApiKey: string;
+  setGroqApiKey: (key: string) => void;
+  
+  googleKnowledgeGraphApiKey: string;
+  setGoogleKnowledgeGraphApiKey: (key: string) => void;
+  
+  phantombusterApiKey: string;
+  setPhantombusterApiKey: (key: string) => void;
+  
+  scrapecreatorsApiKey: string;
+  setScrapecreatorsApiKey: (key: string) => void;
 }
 
 const getStoredBool = (key: string, fallback: boolean): boolean => {
@@ -75,6 +91,13 @@ export const useUIStore = create<UIState>((set) => ({
     set({ deepIdentityScan });
   },
 
+  enableSoundAlerts: getStoredBool('enableSoundAlerts', true),
+  setEnableSoundAlerts: (enableSoundAlerts) => {
+    localStorage.setItem('enableSoundAlerts', String(enableSoundAlerts));
+    set({ enableSoundAlerts });
+  },
+
+  // Third-Party API Keys
   serpApiKey: getStoredStr('serpApiKey', ''),
   setSerpApiKey: (serpApiKey) => {
     localStorage.setItem('serpApiKey', serpApiKey);
@@ -87,9 +110,34 @@ export const useUIStore = create<UIState>((set) => ({
     set({ tavilyApiKey });
   },
 
-  enableSoundAlerts: getStoredBool('enableSoundAlerts', true),
-  setEnableSoundAlerts: (enableSoundAlerts) => {
-    localStorage.setItem('enableSoundAlerts', String(enableSoundAlerts));
-    set({ enableSoundAlerts });
+  geminiApiKey: getStoredStr('geminiApiKey', ''),
+  setGeminiApiKey: (geminiApiKey) => {
+    localStorage.setItem('geminiApiKey', geminiApiKey);
+    set({ geminiApiKey });
+  },
+
+  groqApiKey: getStoredStr('groqApiKey', ''),
+  setGroqApiKey: (groqApiKey) => {
+    localStorage.setItem('groqApiKey', groqApiKey);
+    set({ groqApiKey });
+  },
+
+  googleKnowledgeGraphApiKey: getStoredStr('googleKnowledgeGraphApiKey', ''),
+  setGoogleKnowledgeGraphApiKey: (googleKnowledgeGraphApiKey) => {
+    localStorage.setItem('googleKnowledgeGraphApiKey', googleKnowledgeGraphApiKey);
+    set({ googleKnowledgeGraphApiKey });
+  },
+
+
+  phantombusterApiKey: getStoredStr('phantombusterApiKey', ''),
+  setPhantombusterApiKey: (phantombusterApiKey) => {
+    localStorage.setItem('phantombusterApiKey', phantombusterApiKey);
+    set({ phantombusterApiKey });
+  },
+
+  scrapecreatorsApiKey: getStoredStr('scrapecreatorsApiKey', ''),
+  setScrapecreatorsApiKey: (scrapecreatorsApiKey) => {
+    localStorage.setItem('scrapecreatorsApiKey', scrapecreatorsApiKey);
+    set({ scrapecreatorsApiKey });
   },
 }));

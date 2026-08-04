@@ -33,6 +33,18 @@ export const FaceHistoryPage: React.FC = () => {
 
   const serverBase = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
 
+  const getImageUrl = (uploadedImage: string) => {
+    if (!uploadedImage) return '';
+    let cleanPath = uploadedImage.replace(/\\/g, '/');
+    if (cleanPath.startsWith('ci_backend/')) {
+      cleanPath = cleanPath.substring('ci_backend/'.length);
+    }
+    if (!cleanPath.startsWith('/')) {
+      cleanPath = '/' + cleanPath;
+    }
+    return `${serverBase}${cleanPath}`;
+  };
+
   return (
     <div className="flex flex-col gap-6 animate-slide-down max-w-7xl mx-auto w-full">
       {/* Header */}
@@ -108,16 +120,20 @@ export const FaceHistoryPage: React.FC = () => {
                 <tr key={item.id} className="border-b border-slate-50 hover:bg-slate-50/30 transition-colors">
                   <td className="py-4 px-6">
                     <div className="flex items-center gap-2">
-                      {getStatusIcon(item.status)}
+                       {getStatusIcon(item.status)}
                       <span className="text-xs font-bold text-slate-700">{item.status.replace('_', ' ')}</span>
                     </div>
                   </td>
                   <td className="py-4 px-6">
-                    <div className="h-10 w-10 bg-slate-100 rounded-lg overflow-hidden border border-slate-200 flex items-center justify-center">
-                       {item.uploadedImage ? (
-                         <img src={`${serverBase}${item.uploadedImage.replace('ci_backend\\\\', '/')}`} className="h-full w-full object-cover" alt="Search query" onError={(e) => (e.currentTarget.style.display = 'none')} />
-                       ) : (
-                         <ImageIcon className="h-4 w-4 text-slate-400" />
+                    <div className="h-10 w-10 bg-slate-100 rounded-lg overflow-hidden border border-slate-200 flex items-center justify-center relative">
+                       <ImageIcon className="h-4 w-4 text-slate-400 absolute" />
+                       {item.uploadedImage && (
+                         <img 
+                           src={getImageUrl(item.uploadedImage)} 
+                           className="h-full w-full object-cover absolute inset-0 z-10 bg-slate-100 animate-fade-in" 
+                           alt="Search query" 
+                           onError={(e) => { e.currentTarget.style.display = 'none'; }} 
+                         />
                        )}
                     </div>
                   </td>
