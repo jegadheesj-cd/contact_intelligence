@@ -251,7 +251,7 @@ export const ContactsListPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-55 font-semibold text-slate-800">
-                {data.contacts.map((contact, idx) => {
+                {data.contacts.map((contact) => {
                   const initials = contact.name
                     .split(/\s+/)
                     .map((n) => n[0])
@@ -437,7 +437,6 @@ export const ContactsListPage: React.FC = () => {
         title="Delete Contact"
         message="Are you sure you want to delete this contact? This will delete all associated cards, notes, and activity histories."
         confirmText="Delete"
-        confirmButtonClass="bg-rose-600 hover:bg-rose-700 text-white"
         variant="danger"
         isLoading={deleteMutation.isPending}
       />

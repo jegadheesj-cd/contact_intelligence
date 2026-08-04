@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { useUIStore } from '../store/useUIStore';
@@ -25,7 +25,6 @@ import {
   HelpCircle,
   Sparkles,
   Eye,
-  Activity,
   History
 } from 'lucide-react';
 
@@ -34,13 +33,46 @@ export const DashboardLayout: React.FC = () => {
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
   const addToast = useToastStore((state) => state.addToast);
-  const { isSidebarOpen, toggleSidebar, setSidebarOpen, themeMode, setThemeMode } = useUIStore();
+  
+  const { 
+    isSidebarOpen, 
+    toggleSidebar, 
+    setSidebarOpen, 
+    themeMode, 
+    setThemeMode,
+    cacheBypass,
+    setCacheBypass,
+    cosineThreshold,
+    setCosineThreshold,
+    deepIdentityScan,
+    setDeepIdentityScan,
+    serpApiKey,
+    setSerpApiKey,
+    tavilyApiKey,
+    setTavilyApiKey,
+    enableSoundAlerts,
+    setEnableSoundAlerts
+  } = useUIStore();
+
   const [isCollapsed, setIsCollapsed] = useState(false);
   
   // Custom states for Settings and Help dialog overlays
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
+
+  // API key visibility states
+  const [showSerpKey, setShowSerpKey] = useState(false);
+  const [showTavilyKey, setShowTavilyKey] = useState(false);
+
+  // Sync theme class with document root
+  useEffect(() => {
+    if (themeMode === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [themeMode]);
 
   const handleLogout = () => {
     logout();
@@ -142,11 +174,11 @@ export const DashboardLayout: React.FC = () => {
             )}
           </div>
 
-          {/* Dark Mode toggle placeholder */}
+          {/* Dark Mode Toggle */}
           <button
             onClick={() => setThemeMode(themeMode === 'light' ? 'dark' : 'light')}
             className="p-1.5 hover:bg-slate-50 text-slate-500 rounded-lg outline-none cursor-pointer transition-colors"
-            title="Toggle theme (visual representation)"
+            title="Toggle Dark Mode"
           >
             {themeMode === 'dark' ? <Sun className="h-4.5 w-4.5 text-amber-500" /> : <Moon className="h-4.5 w-4.5" />}
           </button>
@@ -263,30 +295,185 @@ export const DashboardLayout: React.FC = () => {
 
       {/* Settings Dialog Overlay */}
       {showSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/40 backdrop-blur-xs">
-          <div className="bg-white border border-slate-100 rounded-2xl shadow-xl w-full max-w-md p-6 animate-slide-up">
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-2">
+        <div 
+          onClick={() => setShowSettings(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/40 backdrop-blur-xs"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-2xl shadow-xl w-full max-w-lg p-6 animate-slide-up relative overflow-hidden"
+          >
+            <button 
+              onClick={() => setShowSettings(false)} 
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <h3 className="text-sm font-bold text-slate-800 dark:text-zinc-100 uppercase tracking-wider mb-1 flex items-center gap-2">
               <Settings className="h-4.5 w-4.5 text-indigo-500" /> Platform Settings
             </h3>
-            <p className="text-xs text-slate-500 mb-6">
-              Configure reverse face matching weights, SerpApi credentials, and Tavily search rates.
+            <p className="text-xs text-slate-500 dark:text-zinc-400 mb-5">
+              Customize local search parameters, SerpApi credentials, and Tavily search rates.
             </p>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-50 pb-2.5">
-                <span className="text-xs font-bold text-slate-700">Cache Bypass</span>
-                <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold border border-emerald-100">Enabled</span>
+
+            <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
+              
+              {/* Theme Settings */}
+              <div className="p-3 bg-slate-50/50 dark:bg-zinc-950/50 border border-slate-100 dark:border-zinc-850 rounded-xl">
+                <h4 className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-2">Display & Theme</h4>
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-bold text-slate-700 dark:text-zinc-350">Dark Mode</span>
+                    <span className="text-[10px] text-slate-400 dark:text-zinc-500">Toggle dark visual mode for the dashboard</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={themeMode === 'dark'} 
+                      onChange={(e) => setThemeMode(e.target.checked ? 'dark' : 'light')} 
+                      className="sr-only peer" 
+                    />
+                    <div className="w-9 h-5 bg-slate-200 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-650" />
+                  </label>
+                </div>
               </div>
-              <div className="flex items-center justify-between border-b border-slate-50 pb-2.5">
-                <span className="text-xs font-bold text-slate-700">Cosine Threshold</span>
-                <span className="font-mono text-xs text-slate-500">0.20</span>
+
+              {/* Engine Preferences */}
+              <div className="p-3 bg-slate-50/50 dark:bg-zinc-950/50 border border-slate-100 dark:border-zinc-850 rounded-xl space-y-3">
+                <h4 className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Engine Preferences</h4>
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-bold text-slate-700 dark:text-zinc-350">Cache Bypass</span>
+                    <span className="text-[10px] text-slate-400 dark:text-zinc-500">Force live API scraping on queries</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={cacheBypass} 
+                      onChange={(e) => setCacheBypass(e.target.checked)} 
+                      className="sr-only peer" 
+                    />
+                    <div className="w-9 h-5 bg-slate-200 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-650" />
+                  </label>
+                </div>
+
+                <div className="h-px bg-slate-100/50 dark:bg-zinc-850" />
+
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-bold text-slate-700 dark:text-zinc-350">Deep Identity Scan</span>
+                    <span className="text-[10px] text-slate-400 dark:text-zinc-500">Enable deep OSINT search heuristics</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={deepIdentityScan} 
+                      onChange={(e) => setDeepIdentityScan(e.target.checked)} 
+                      className="sr-only peer" 
+                    />
+                    <div className="w-9 h-5 bg-slate-200 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-650" />
+                  </label>
+                </div>
+
+                <div className="h-px bg-slate-100/50 dark:bg-zinc-850" />
+
+                {/* Cosine Similarity Slider */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700 dark:text-zinc-350">Cosine Similarity Threshold</span>
+                    <span className="font-mono text-xs font-bold text-indigo-500">{cosineThreshold.toFixed(2)}</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="0.10" 
+                    max="0.90" 
+                    step="0.05" 
+                    value={cosineThreshold} 
+                    onChange={(e) => setCosineThreshold(parseFloat(e.target.value))} 
+                    className="w-full h-1 bg-slate-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-650"
+                  />
+                  <div className="text-[9px] text-slate-400 dark:text-zinc-500">
+                    Determines precision margin for face matches. Stricter &lt; 0.20 &lt; Lenient.
+                  </div>
+                </div>
               </div>
+
+              {/* API Credentials */}
+              <div className="p-3 bg-slate-50/50 dark:bg-zinc-950/50 border border-slate-100 dark:border-zinc-850 rounded-xl space-y-3">
+                <h4 className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Third-Party APIs</h4>
+                
+                {/* SerpApi Key */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-700 dark:text-zinc-400 uppercase tracking-wider">SerpApi Key</label>
+                  <div className="relative">
+                    <input 
+                      type={showSerpKey ? "text" : "password"} 
+                      placeholder="Enter SerpApi Credentials..." 
+                      value={serpApiKey} 
+                      onChange={(e) => setSerpApiKey(e.target.value)} 
+                      className="w-full pl-3 pr-9 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-850 rounded-lg text-xs outline-none"
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowSerpKey(!showSerpKey)} 
+                      className="absolute right-2.5 top-2 text-slate-450 hover:text-indigo-500 dark:hover:text-indigo-400"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tavily Key */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-700 dark:text-zinc-400 uppercase tracking-wider">Tavily Key</label>
+                  <div className="relative">
+                    <input 
+                      type={showTavilyKey ? "text" : "password"} 
+                      placeholder="Enter Tavily Credentials..." 
+                      value={tavilyApiKey} 
+                      onChange={(e) => setTavilyApiKey(e.target.value)} 
+                      className="w-full pl-3 pr-9 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-850 rounded-lg text-xs outline-none"
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowTavilyKey(!showTavilyKey)} 
+                      className="absolute right-2.5 top-2 text-slate-450 hover:text-indigo-500 dark:hover:text-indigo-400"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sound Settings */}
+              <div className="p-3 bg-slate-50/50 dark:bg-zinc-950/50 border border-slate-100 dark:border-zinc-850 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-bold text-slate-700 dark:text-zinc-350">Sound Alerts</span>
+                    <span className="text-[10px] text-slate-400 dark:text-zinc-500">Play confirmation chime on successful scan/match</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={enableSoundAlerts} 
+                      onChange={(e) => setEnableSoundAlerts(e.target.checked)} 
+                      className="sr-only peer" 
+                    />
+                    <div className="w-9 h-5 bg-slate-200 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-650" />
+                  </label>
+                </div>
+              </div>
+
             </div>
-            <div className="mt-6 flex justify-end">
+
+            <div className="mt-5 flex justify-end">
               <button
                 onClick={() => setShowSettings(false)}
-                className="bg-indigo-650 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold cursor-pointer"
+                className="bg-indigo-650 hover:bg-indigo-700 text-white px-5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors"
               >
-                Close
+                Close & Save
               </button>
             </div>
           </div>
@@ -295,23 +482,45 @@ export const DashboardLayout: React.FC = () => {
 
       {/* Help Dialog Overlay */}
       {showHelp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/40 backdrop-blur-xs">
-          <div className="bg-white border border-slate-100 rounded-2xl shadow-xl w-full max-w-md p-6 animate-slide-up">
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-2">
+        <div 
+          onClick={() => setShowHelp(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/40 backdrop-blur-xs"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-2xl shadow-xl w-full max-w-md p-6 animate-slide-up relative"
+          >
+            <button 
+              onClick={() => setShowHelp(false)} 
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:bg-slate-50 dark:hover:bg-zinc-800 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <h3 className="text-sm font-bold text-slate-800 dark:text-zinc-100 uppercase tracking-wider mb-2 flex items-center gap-2">
               <HelpCircle className="h-4.5 w-4.5 text-indigo-500" /> Help Center & Guides
             </h3>
-            <p className="text-xs text-slate-500 mb-6">
+            <p className="text-xs text-slate-500 dark:text-zinc-400 mb-6">
               Learn how to ingest contacts using Card scanning, QR Codes, NFC, and biometric face match.
             </p>
-            <div className="space-y-3 font-semibold text-xs text-slate-700">
-              <p>• <b>Card Scanner:</b> Upload photos of business cards to extract fields using local OCR.</p>
-              <p>• <b>Face Recognition:</b> Enroll contact photos and perform reverse face searches to locate LinkedIn profiles.</p>
-              <p>• <b>Identity Resolution:</b> Engine merges OSINT fields using 15 identity signals.</p>
+            <div className="space-y-4 font-semibold text-xs text-slate-700 dark:text-zinc-300">
+              <div className="flex gap-2">
+                <span className="text-indigo-500 font-bold">•</span>
+                <p><b>Card Scanner:</b> Upload photos of business cards to extract fields using local OCR.</p>
+              </div>
+              <div className="flex gap-2">
+                <span className="text-indigo-500 font-bold">•</span>
+                <p><b>Face Recognition:</b> Enroll contact photos and perform reverse face searches to locate LinkedIn profiles.</p>
+              </div>
+              <div className="flex gap-2">
+                <span className="text-indigo-500 font-bold">•</span>
+                <p><b>Identity Resolution:</b> Engine merges OSINT fields using 15 identity signals.</p>
+              </div>
             </div>
             <div className="mt-6 flex justify-end">
               <button
                 onClick={() => setShowHelp(false)}
-                className="bg-indigo-650 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold cursor-pointer"
+                className="bg-indigo-650 hover:bg-indigo-700 text-white px-5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors"
               >
                 Got It
               </button>

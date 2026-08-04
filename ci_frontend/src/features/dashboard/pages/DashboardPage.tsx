@@ -4,7 +4,6 @@ import { useDashboardWidgets, useDashboardAnalytics } from '../../../hooks/useDa
 import { Button } from '../../../components/Button';
 import {
   Users,
-  Zap,
   Activity,
   UserCheck,
   FolderOpen,
@@ -14,7 +13,6 @@ import {
   RefreshCw,
   AlertCircle,
   Clock,
-  TrendingUp,
 } from 'lucide-react';
 
 interface CountUpProps {
@@ -133,8 +131,6 @@ export const DashboardPage: React.FC = () => {
     );
   }
 
-  const ocrRate = analytics?.ocrSuccessRate !== undefined ? analytics.ocrSuccessRate : 100;
-  const matchAccuracy = analytics?.recognitionAccuracy !== undefined ? analytics.recognitionAccuracy : 0;
   const avgOcrTime = analytics?.averageOcrTimeMs !== undefined ? analytics.averageOcrTimeMs : 0;
 
   return (

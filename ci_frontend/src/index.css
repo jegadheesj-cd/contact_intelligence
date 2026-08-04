@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer utilities {
   @keyframes loading {
     0% {
@@ -174,6 +176,99 @@ body {
 
 .animate-pulse-soft {
   animation: pulse-soft 2s infinite ease-in-out;
+}
+
+/* ==========================================
+   Premium Dark Mode Theme Overrides
+   ========================================== */
+.dark body {
+  background-color: #09090b !important;
+  color: #f4f4f5 !important;
+}
+
+/* Override background colors of panels/cards */
+.dark .bg-white {
+  background-color: #18181b !important;
+}
+
+.dark .bg-slate-50,
+.dark .bg-slate-50\/50,
+.dark .bg-slate-50\/30,
+.dark .bg-slate-100 {
+  background-color: #09090b !important;
+}
+
+/* Border overrides */
+.dark .border-slate-100, 
+.dark .border-slate-150, 
+.dark .border-slate-200,
+.dark .border-slate-250,
+.dark .border-slate-100\/80 {
+  border-color: #27272a !important;
+}
+
+.dark header {
+  background-color: rgba(24, 24, 27, 0.85) !important;
+  border-color: rgba(39, 39, 42, 0.8) !important;
+}
+
+/* Input fields */
+.dark input, 
+.dark select, 
+.dark textarea {
+  background-color: #1c1c1e !important;
+  color: #f4f4f5 !important;
+  border-color: #2c2c2e !important;
+}
+
+.dark input::placeholder {
+  color: #71717a !important;
+}
+
+/* Text overrides */
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700 {
+  color: #f4f4f5 !important;
+}
+
+.dark .text-slate-650,
+.dark .text-slate-600,
+.dark .text-slate-550,
+.dark .text-slate-500 {
+  color: #a1a1aa !important;
+}
+
+.dark .text-slate-400 {
+  color: #71717a !important;
+}
+
+.dark .bg-dot-grid-light {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1.5px, transparent 1.5px) !important;
+}
+
+/* Fix shadows and cards */
+.dark .shadow-xs,
+.dark .shadow-sm {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.5) !important;
+}
+
+.dark .shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.5) !important;
+}
+
+.dark .card-lift:hover {
+  box-shadow: 0 16px 32px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(99, 102, 241, 0.2) !important;
+}
+
+.dark .hover\:bg-slate-50:hover {
+  background-color: #27272a !important;
+}
+
+/* Extra overrides for dropdowns, tooltips, and dynamic subcomponents */
+.dark .glass-panel {
+  background: rgba(24, 24, 27, 0.8) !important;
+  border: 1px solid rgba(39, 39, 42, 0.8) !important;
 }
 
 
