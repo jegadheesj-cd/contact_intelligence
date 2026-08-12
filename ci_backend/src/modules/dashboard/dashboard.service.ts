@@ -175,16 +175,27 @@ export class DashboardService {
 
     // 3. Queue Status (Waiting, Active, Completed, Failed counts)
     const getQueueStatus = async (q: any) => {
+      let timeoutId: NodeJS.Timeout | undefined;
       try {
-        const [waiting, active, completed, failed] = await Promise.all([
-          q.getWaitingCount(),
-          q.getActiveCount(),
-          q.getCompletedCount(),
-          q.getFailedCount(),
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('Queue query timeout')), 1000);
+        });
+        const [waiting, active, completed, failed] = await Promise.race([
+          Promise.all([
+            q.getWaitingCount(),
+            q.getActiveCount(),
+            q.getCompletedCount(),
+            q.getFailedCount(),
+          ]),
+          timeoutPromise,
         ]);
         return { waiting, active, completed, failed };
       } catch (err) {
         return { waiting: 0, active: 0, completed: 0, failed: 0 };
+      } finally {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
       }
     };
 

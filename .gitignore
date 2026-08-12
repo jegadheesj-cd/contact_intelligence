@@ -1,0 +1,7 @@
+# Local Redis binaries and temporary logs
+redis/
+*.log
+
+# Root npm locks
+package-lock.json
+node_modules/

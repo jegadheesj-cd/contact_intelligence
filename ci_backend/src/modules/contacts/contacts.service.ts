@@ -4,6 +4,7 @@ import { enrichmentQueue, aiSummaryQueue } from '../../queue/queue';
 import { ContactSource, Prisma } from '@prisma/client';
 import { calculateDecisionMakerScore } from '../profile-enrichment/enrichment.service';
 import logger from '../../config/logger';
+import redisClient from '../../config/redis';
 
 export class ContactsService {
   public async findDuplicateContact(userId: string, data: any): Promise<any | null> {
@@ -192,6 +193,24 @@ export class ContactsService {
 
     if (!contact) {
       throw new AppError('Contact not found or access denied', 404);
+    }
+
+    if (contact.professionalProfile) {
+      const status = contact.professionalProfile.enrichmentStatus;
+      if (['QUEUED', 'PROCESSING', 'FETCHING_PROFILE', 'VERIFYING', 'GENERATING_SUMMARY'].includes(status)) {
+        if (redisClient.status !== 'ready') {
+          await prisma.professionalProfile.update({
+            where: { id: contact.professionalProfile.id },
+            data: { 
+              enrichmentStatus: 'FAILED' as any,
+              verificationStatus: 'Background enrichment queue is offline. Please make sure Redis is running.'
+            },
+          }).catch(() => {});
+          
+          contact.professionalProfile.enrichmentStatus = 'FAILED' as any;
+          contact.professionalProfile.verificationStatus = 'Background enrichment queue is offline. Please make sure Redis is running.';
+        }
+      }
     }
 
     return contact;

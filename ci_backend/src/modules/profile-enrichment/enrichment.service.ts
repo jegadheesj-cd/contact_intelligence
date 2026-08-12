@@ -1,4 +1,4 @@
-import { enrichmentQueue } from '../../queue/queue';
+import { enrichmentQueue, addJobWithTimeout } from '../../queue/queue';
 import prisma from '../../config/db';
 import { AppError } from '../../utils/AppError';
 import logger from '../../config/logger';
@@ -49,10 +49,19 @@ export class ProfileEnrichmentService {
       data: { enrichmentStatus: 'QUEUED' as any },
     });
 
-    await enrichmentQueue.add('enrich-profile', {
-      contactId: contact.id,
-      profileId: profile.id,
-    });
+    try {
+      await addJobWithTimeout(enrichmentQueue, 'enrich-profile', {
+        contactId: contact.id,
+        profileId: profile.id,
+      });
+    } catch (err) {
+      // Revert status to PENDING
+      await prisma.professionalProfile.update({
+        where: { id: profile.id },
+        data: { enrichmentStatus: 'PENDING' as any },
+      });
+      throw new AppError('Background enrichment queue is offline. Please make sure Redis is running.', 503);
+    }
 
     return {
       message: 'Profile enrichment task has been successfully queued.',

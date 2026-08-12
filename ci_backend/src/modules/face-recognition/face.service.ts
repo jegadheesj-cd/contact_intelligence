@@ -1,6 +1,6 @@
 import prisma from '../../config/db';
 import { AppError } from '../../utils/AppError';
-import { faceRecognitionQueue } from '../../queue/queue';
+import { faceRecognitionQueue, addJobWithTimeout } from '../../queue/queue';
 import fs from 'fs';
 import path from 'path';
 import { scanFileForMalware, calculateFileHash } from '../../utils/fileSecurity';
@@ -46,11 +46,20 @@ export class FaceRecognitionService {
     });
 
     // 3. Queue Face Recognition background processing
-    await faceRecognitionQueue.add(
-      'process-face',
-      { faceRecognitionId: faceRecord.id },
-      { jobId: faceRecord.id, attempts: 3, backoff: { type: 'exponential', delay: 5000 } }
-    );
+    try {
+      await addJobWithTimeout(
+        faceRecognitionQueue,
+        'process-face',
+        { faceRecognitionId: faceRecord.id },
+        { jobId: faceRecord.id, attempts: 3, backoff: { type: 'exponential', delay: 5000 } }
+      );
+    } catch (err) {
+      await prisma.faceRecognition.update({
+        where: { id: faceRecord.id },
+        data: { status: 'FAILED' as any },
+      }).catch(() => {});
+      throw new AppError('Background face recognition queue is offline. Please make sure Redis is running.', 503);
+    }
 
     return faceRecord;
   }

@@ -15,3 +15,17 @@ export const faceRecognitionQueue = new Queue('face-recognition-queue', { connec
 
 logger.info('BullMQ Queues initialized with connection options.');
 
+export async function addJobWithTimeout<T = any>(
+  queue: Queue,
+  name: string,
+  data: any,
+  opts?: any,
+  timeoutMs: number = 2000
+): Promise<T> {
+  const addPromise = queue.add(name, data, opts);
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Redis connection timeout')), timeoutMs)
+  );
+  return Promise.race([addPromise, timeoutPromise]) as Promise<T>;
+}
+

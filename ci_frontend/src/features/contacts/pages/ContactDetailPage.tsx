@@ -71,6 +71,7 @@ interface CountUpProps {
 }
 
 const CountUp: React.FC<CountUpProps> = ({ end, decimals = 0, suffix = '', duration = 750 }) => {
+  const safeEnd = typeof end === 'number' ? end : 0;
   const [count, setCount] = useState(0);
 
   useEffect(() => {
@@ -79,19 +80,19 @@ const CountUp: React.FC<CountUpProps> = ({ end, decimals = 0, suffix = '', durat
     const step = (timestamp: number) => {
       if (!startTimestamp) startTimestamp = timestamp;
       const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-      const current = progress * end;
+      const current = progress * safeEnd;
       setCount(current);
       if (progress < 1) {
         animationFrameId = window.requestAnimationFrame(step);
       } else {
-        setCount(end);
+        setCount(safeEnd);
       }
     };
     animationFrameId = window.requestAnimationFrame(step);
     return () => window.cancelAnimationFrame(animationFrameId);
-  }, [end, duration]);
+  }, [safeEnd, duration]);
 
-  return <span>{count.toFixed(decimals)}{suffix}</span>;
+  return <span>{(count ?? 0).toFixed(decimals)}{suffix}</span>;
 };
 
 export const ContactDetailPage: React.FC = () => {
@@ -1045,7 +1046,7 @@ export const ContactDetailPage: React.FC = () => {
                       </span>
                       <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-3">Candidate Identity Confidence</h4>
                     </div>
-                    {verificationConfidence !== undefined && (
+                    {verificationConfidence != null && (
                       <div className="relative h-20 w-20 flex items-center justify-center mt-3">
                         <svg className="absolute transform -rotate-90 w-full h-full" viewBox="0 0 36 36">
                           <circle cx="18" cy="18" r="16" strokeWidth="2.5" stroke="#f1f5f9" fill="transparent" />

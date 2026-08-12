@@ -1,6 +1,6 @@
 import prisma from '../../config/db';
 import { AppError } from '../../utils/AppError';
-import { ocrQueue } from '../../queue/queue';
+import { ocrQueue, addJobWithTimeout } from '../../queue/queue';
 import fs from 'fs';
 import path from 'path';
 
@@ -47,11 +47,20 @@ export class BusinessCardsService {
     });
 
     // 3. Queue OCR background job
-    await ocrQueue.add(
-      'process-ocr',
-      { businessCardId: businessCard.id },
-      { attempts: 3, backoff: { type: 'exponential', delay: 5000 } }
-    );
+    try {
+      await addJobWithTimeout(
+        ocrQueue,
+        'process-ocr',
+        { businessCardId: businessCard.id },
+        { attempts: 3, backoff: { type: 'exponential', delay: 5000 } }
+      );
+    } catch (err) {
+      await prisma.businessCard.update({
+        where: { id: businessCard.id },
+        data: { ocrStatus: 'FAILED' as any },
+      }).catch(() => {});
+      throw new AppError('Background OCR processing queue is offline. Please make sure Redis is running.', 503);
+    }
 
     return businessCard;
   }

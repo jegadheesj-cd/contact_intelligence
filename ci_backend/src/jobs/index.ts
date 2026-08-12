@@ -492,7 +492,7 @@ export const faceRecognitionWorker = new Worker(
               const prompt = `Extract only the clean, full name of the person from this search result title. Do not include titles (like CEO, Founder), company names, video platforms (like YouTube), or descriptions. Return ONLY the name (e.g., Mark Zuckerberg).
 Title: "${cleanName}"
 Name:`;
-              const aiResponse = await generateTextWithFallback(prompt, { maxTokens: 20 });
+              const aiResponse = await generateTextWithFallback(prompt, 'gemini-1.5-pro', 'Name Cleaning');
               if (aiResponse && aiResponse.trim().length > 0) {
                 cleanName = aiResponse.trim().replace(/^['"\s]+|['"\s]+$/g, '');
               }

@@ -23,6 +23,7 @@ interface CountUpProps {
 }
 
 const CountUp: React.FC<CountUpProps> = ({ end, decimals = 0, suffix = '', duration = 750 }) => {
+  const safeEnd = typeof end === 'number' ? end : 0;
   const [count, setCount] = useState(0);
 
   useEffect(() => {
@@ -31,19 +32,19 @@ const CountUp: React.FC<CountUpProps> = ({ end, decimals = 0, suffix = '', durat
     const step = (timestamp: number) => {
       if (!startTimestamp) startTimestamp = timestamp;
       const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-      const current = progress * end;
+      const current = progress * safeEnd;
       setCount(current);
       if (progress < 1) {
         animationFrameId = window.requestAnimationFrame(step);
       } else {
-        setCount(end);
+        setCount(safeEnd);
       }
     };
     animationFrameId = window.requestAnimationFrame(step);
     return () => window.cancelAnimationFrame(animationFrameId);
-  }, [end, duration]);
+  }, [safeEnd, duration]);
 
-  return <span>{count.toFixed(decimals)}{suffix}</span>;
+  return <span>{(count ?? 0).toFixed(decimals)}{suffix}</span>;
 };
 
 export const DashboardPage: React.FC = () => {
