@@ -91,7 +91,7 @@ Output ONLY a valid JSON object matching this exact format:
 }
 Do not include markdown blocks or any conversational text.`;
 
-      const text = await generateTextWithFallback(prompt, 'gemini-2.0-flash', 'AI Summary');
+      const text = await generateTextWithFallback(prompt, 'gemini-1.5-flash', 'AI Summary');
       
       const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(cleaned);

@@ -252,7 +252,7 @@ export class EnterpriseIdentityResolutionEngine {
       logger.info(`[IdentityResolutionEngine] Running AI Identity Verification on top ${topCandidates.length} candidates...`);
       try {
         const prompt = this.buildAIPrompt(context, topCandidates);
-        const aiResponse = await generateTextWithFallback(prompt, 'gemini-1.5-pro', 'Identity Verification');
+        const aiResponse = await generateTextWithFallback(prompt, 'gemini-1.5-flash', 'Identity Verification');
         this.applyAIAdjustments(aiResponse, topCandidates);
       } catch (e: any) {
         logger.error(`[IdentityResolutionEngine] AI Verification Failed: ${e.message}`);

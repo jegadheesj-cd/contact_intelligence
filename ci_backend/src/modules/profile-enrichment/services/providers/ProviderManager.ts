@@ -20,11 +20,14 @@ export class ProviderManager {
       return response;
     }
 
-    // Immediately throw error for failures (QUOTA_EXCEEDED, RATE_LIMITED, etc.)
-    throw new ProviderError(
-      response.status,
-      response.provider,
-      response.message || 'Provider failed without a specific message.'
-    );
+    // Log warning and return empty results for failures (QUOTA_EXCEEDED, RATE_LIMITED, etc.)
+    console.warn(`[ProviderManager] Provider ${response.provider} failed: ${response.message}`);
+    return {
+      success: false,
+      provider: response.provider,
+      status: response.status,
+      results: [],
+      message: response.message
+    };
   }
 }

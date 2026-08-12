@@ -136,6 +136,20 @@ export class PhantomBusterEnricher {
       return c.name || c.title || '';
     });
 
+    const activities = pbData.activities || [];
+    
+    if (pbData.volunteerExperience && Array.isArray(pbData.volunteerExperience)) {
+      pbData.volunteerExperience.forEach((vol: any) => {
+        activities.push(`Volunteer: ${vol.role || vol.title} at ${vol.organizationName || vol.company} (${vol.dateRange || ''})`);
+      });
+    }
+    
+    if (pbData.organizations && Array.isArray(pbData.organizations)) {
+      pbData.organizations.forEach((org: any) => {
+        activities.push(`Organization/Club: ${org.name || org.organization} - ${org.position || 'Member'}`);
+      });
+    }
+
     return {
       fullName: pbData.fullName || (pbData.firstName ? `${pbData.firstName} ${pbData.lastName || ''}`.trim() : ''),
       headline: pbData.headline || pbData.jobTitle || '',
@@ -159,7 +173,10 @@ export class PhantomBusterEnricher {
         }
       ],
       source: 'PhantomBuster LinkedIn Data',
-      sourceConfidence: 100, // Highest confidence since we directly scraped the verified URL
+      sourceConfidence: 100,
+      rawText: JSON.stringify(pbData, null, 2),
+      activities: activities,
+      posts: pbData.posts || pbData.recentPosts || []
     };
   }
 }

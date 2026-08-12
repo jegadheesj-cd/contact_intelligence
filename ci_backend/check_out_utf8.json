@@ -1,0 +1,856 @@
+﻿{
+  "id": "a59620f1-c7c1-44a4-98c6-12297e780ee0",
+  "contactId": "d53824a4-48b3-4ce2-af09-874b4990a821",
+  "providerResponses": [
+    {
+      "data": {
+        "skills": [],
+        "source": "LinkedIn URL Discovery",
+        "company": "Cloud Destinations",
+        "summary": "Saranya can introduce you to 10+ people at Cloud Destinations. EXOps & HR leader with extensive experience enabling scale and operational rigor within the IT ...",
+        "fullName": "Saranya Muruganantham",
+        "headline": "Saranya Muruganantham - EXOps & HR Leader",
+        "projects": [],
+        "education": [],
+        "experience": [],
+        "designation": "EXOps & HR Leader",
+        "explainability": {
+          "penalties": [],
+          "confidence": 65,
+          "verification": "Likely Match 65%",
+          "matchedSignals": [
+            "Full Name",
+            "Company",
+            "Professional Bio"
+          ],
+          "missingSignals": [
+            "Designation not matched"
+          ]
+        },
+        "publicProfiles": [
+          {
+            "url": "https://in.linkedin.com/in/saranya-muruganantham-695237142",
+            "reasons": [
+              "Full Name Similarity: +35",
+              "Company Match: +25",
+              "Professional Bio Similarity: +5",
+              "Γ£ö Strong Company Match",
+              "Γ£ö Cross-Platform Consistency",
+              "Γ£ö Portfolio Verification",
+              "Γ£ö Bio Matches BC Keywords",
+              "AI Verification: The candidate has a strong company match with 'Cloud Destinations', cross-platform consistency, portfolio verification, and bio matches business card keywords, indicating a high likelihood of being the correct person."
+            ],
+            "platform": "LinkedIn",
+            "confidence": 100
+          }
+        ],
+        "sourceConfidence": 100,
+        "verificationStatus": "Likely Match 65%",
+        "verificationReasons": [
+          "Full Name Similarity: +35",
+          "Company Match: +25",
+          "Professional Bio Similarity: +5",
+          "Γ£ö Strong Company Match",
+          "Γ£ö Cross-Platform Consistency",
+          "Γ£ö Portfolio Verification",
+          "Γ£ö Bio Matches BC Keywords",
+          "AI Verification: The candidate has a strong company match with 'Cloud Destinations', cross-platform consistency, portfolio verification, and bio matches business card keywords, indicating a high likelihood of being the correct person."
+        ]
+      },
+      "confidence": 100,
+      "sourceName": "LinkedIn URL Discovery"
+    },
+    {
+      "data": {
+        "skills": [],
+        "source": "Portfolio Scraper",
+        "fullName": "Saranya Muruganantham",
+        "projects": [],
+        "education": [],
+        "experience": [],
+        "technologies": [],
+        "explainability": {
+          "penalties": [
+            "Missing Identity Signals (-10)"
+          ],
+          "confidence": 35,
+          "verification": "Likely Match 35%",
+          "matchedSignals": [
+            "Full Name",
+            "Portfolio"
+          ],
+          "missingSignals": [
+            "Company mismatch",
+            "Designation not matched"
+          ]
+        },
+        "publicProfiles": [
+          {
+            "url": "https://www.scribd.com/document/1009790230/Saranya-Muruganantham",
+            "reasons": [
+              "Full Name Similarity: +35",
+              "Portfolio Ownership: +10",
+              "Missing Identity Signals: -10",
+              "Γ£ö Portfolio Verification",
+              "Γ£ö Website Ownership Match",
+              "AI Verification: The candidate has portfolio verification and website ownership match, but lacks company match and cross-platform consistency, making it a possible but less likely match."
+            ],
+            "platform": "Portfolio",
+            "confidence": 70.0004
+          }
+        ],
+        "sourceConfidence": 70.0004,
+        "verificationStatus": "Likely Match 35%",
+        "verificationReasons": [
+          "Full Name Similarity: +35",
+          "Portfolio Ownership: +10",
+          "Missing Identity Signals: -10",
+          "Γ£ö Portfolio Verification",
+          "Γ£ö Website Ownership Match",
+          "AI Verification: The candidate has portfolio verification and website ownership match, but lacks company match and cross-platform consistency, making it a possible but less likely match."
+        ]
+      },
+      "confidence": 70.0004,
+      "sourceName": "Portfolio Scraper"
+    },
+    {
+      "data": {
+        "skills": [],
+        "source": "Portfolio Scraper",
+        "fullName": "Saranya Muruganantham",
+        "projects": [],
+        "education": [],
+        "experience": [],
+        "technologies": [],
+        "explainability": {
+          "penalties": [
+            "Missing Identity Signals (-10)"
+          ],
+          "confidence": 35,
+          "verification": "Likely Match 35%",
+          "matchedSignals": [
+            "Full Name",
+            "Portfolio"
+          ],
+          "missingSignals": [
+            "Company mismatch",
+            "Designation not matched"
+          ]
+        },
+        "publicProfiles": [
+          {
+            "url": "https://www.scribd.com/document/968217417/SabarirajaMuruganantham",
+            "reasons": [
+              "Full Name Similarity: +35",
+              "Portfolio Ownership: +10",
+              "Missing Identity Signals: -10",
+              "Γ£ö Portfolio Verification",
+              "Γ£ö Website Ownership Match",
+              "AI Verification: The candidate has portfolio verification and website ownership match, but the URL contains a different name 'SabarirajaMuruganantham', making it an unlikely match."
+            ],
+            "platform": "Portfolio",
+            "confidence": 60.00030000000001
+          }
+        ],
+        "sourceConfidence": 60.00030000000001,
+        "verificationStatus": "Likely Match 35%",
+        "verificationReasons": [
+          "Full Name Similarity: +35",
+          "Portfolio Ownership: +10",
+          "Missing Identity Signals: -10",
+          "Γ£ö Portfolio Verification",
+          "Γ£ö Website Ownership Match",
+          "AI Verification: The candidate has portfolio verification and website ownership match, but the URL contains a different name 'SabarirajaMuruganantham', making it an unlikely match."
+        ]
+      },
+      "confidence": 60.00030000000001,
+      "sourceName": "Portfolio Scraper"
+    },
+    {
+      "data": {
+        "skills": [],
+        "source": "Portfolio Scraper",
+        "fullName": "Saranya Muruganantham",
+        "projects": [],
+        "education": [],
+        "experience": [],
+        "technologies": [],
+        "explainability": {
+          "penalties": [
+            "Missing Identity Signals (-10)"
+          ],
+          "confidence": 35,
+          "verification": "Likely Match 35%",
+          "matchedSignals": [
+            "Full Name",
+            "Portfolio"
+          ],
+          "missingSignals": [
+            "Company mismatch",
+            "Designation not matched"
+          ]
+        },
+        "publicProfiles": [
+          {
+            "url": "https://www.scribd.com/document/989681284/Jegan-Resume-1",
+            "reasons": [
+              "Full Name Similarity: +35",
+              "Portfolio Ownership: +10",
+              "Missing Identity Signals: -10",
+              "Γ£ö Portfolio Verification",
+              "Γ£ö Website Ownership Match",
+              "AI Verification: The candidate has portfolio verification and website ownership match, but the URL contains a different name 'Jegan-Resume-1', making it an unlikely match."
+            ],
+            "platform": "Portfolio",
+            "confidence": 60.0001
+          }
+        ],
+        "sourceConfidence": 60.0001,
+        "verificationStatus": "Likely Match 35%",
+        "verificationReasons": [
+          "Full Name Similarity: +35",
+          "Portfolio Ownership: +10",
+          "Missing Identity Signals: -10",
+          "Γ£ö Portfolio Verification",
+          "Γ£ö Website Ownership Match",
+          "AI Verification: The candidate has portfolio verification and website ownership match, but the URL contains a different name 'Jegan-Resume-1', making it an unlikely match."
+        ]
+      },
+      "confidence": 60.0001,
+      "sourceName": "Portfolio Scraper"
+    },
+    {
+      "data": {
+        "skills": [],
+        "source": "Company Website",
+        "company": "Cloud Destinations",
+        "fullName": "Cloud Destinations: Digital Transformation, Data Engineering",
+        "projects": [],
+        "education": [],
+        "companyBio": "Company\n                  \n                    \n                      About Us\n                      Leadership Team\n                      Careers\n                      Announcements\n                      Contact Us",
+        "experience": [],
+        "designation": "Senior HRBP Lead",
+        "profileImage": "favicon.png",
+        "explainability": {
+          "penalties": [],
+          "confidence": 99,
+          "verification": "Likely Match 99%",
+          "matchedSignals": [
+            "Company",
+            "Designation"
+          ],
+          "missingSignals": [
+            "Full Name not matched"
+          ]
+        },
+        "publicProfiles": [
+          {
+            "url": "https://clouddestinations.com/",
+            "reasons": [
+              "Company Match: +25",
+              "Designation Match: +15",
+              "Official Company Website Boost: +60",
+              "Penalty: Strong Name Mismatch: -50"
+            ],
+            "platform": "Company Website",
+            "confidence": 49.9014
+          }
+        ],
+        "sourceConfidence": 49.9014,
+        "verificationStatus": "Unverified",
+        "verificationReasons": [
+          "Company Match: +25",
+          "Designation Match: +15",
+          "Official Company Website Boost: +60",
+          "Penalty: Strong Name Mismatch: -50"
+        ]
+      },
+      "confidence": 49.9014,
+      "sourceName": "Company Website"
+    },
+    {
+      "data": {
+        "skills": [],
+        "source": "Company Website",
+        "company": "Cloud Destinations",
+        "fullName": "Job Openings",
+        "projects": [],
+        "education": [],
+        "companyBio": "(function (w, d, s, l, i) { w[l] = w[l] || []; w[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' }); var f = d.getElementsByTagName(s)[0], j = d.createEl",
+        "experience": [],
+        "designation": "Senior HRBP Lead",
+        "profileImage": "/company-profile/favicon.ico",
+        "explainability": {
+          "penalties": [],
+          "confidence": 99,
+          "verification": "Likely Match 99%",
+          "matchedSignals": [
+            "Company",
+            "Designation"
+          ],
+          "missingSignals": [
+            "Full Name not matched"
+          ]
+        },
+        "publicProfiles": [
+          {
+            "url": "https://www.dice.com/company-profile/baafc102-ec73-5d10-b53b-63f2450b3dbf",
+            "reasons": [
+              "Company Match: +25",
+              "Designation Match: +15",
+              "Official Company Website Boost: +60",
+              "Penalty: Strong Name Mismatch: -50"
+            ],
+            "platform": "Company Website",
+            "confidence": 49.90130000000001
+          }
+        ],
+        "sourceConfidence": 49.90130000000001,
+        "verificationStatus": "Unverified",
+        "verificationReasons": [
+          "Company Match: +25",
+          "Designation Match: +15",
+          "Official Company Website Boost: +60",
+          "Penalty: Strong Name Mismatch: -50"
+        ]
+      },
+      "confidence": 49.90130000000001,
+      "sourceName": "Company Website"
+    },
+    {
+      "data": {
+        "skills": [],
+        "source": "Company Website",
+        "company": "Cloud Destinations",
+        "fullName": "Careers",
+        "projects": [],
+        "education": [],
+        "companyBio": "Company\n                \n                  \n                    About Us\n                    Leadership Team\n                    Careers\n                    Announcements\n                    Contact Us",
+        "experience": [],
+        "designation": "Senior HRBP Lead",
+        "profileImage": "favicon.png",
+        "explainability": {
+          "penalties": [],
+          "confidence": 99,
+          "verification": "Likely Match 99%",
+          "matchedSignals": [
+            "Company",
+            "Designation"
+          ],
+          "missingSignals": [
+            "Full Name not matched"
+          ]
+        },
+        "publicProfiles": [
+          {
+            "url": "https://clouddestinations.com/careers.html",
+            "reasons": [
+              "Company Match: +25",
+              "Designation Match: +15",
+              "Official Company Website Boost: +60",
+              "Penalty: Strong Name Mismatch: -50"
+            ],
+            "platform": "Company Website",
+            "confidence": 49.9012
+          }
+        ],
+        "sourceConfidence": 49.9012,
+        "verificationStatus": "Unverified",
+        "verificationReasons": [
+          "Company Match: +25",
+          "Designation Match: +15",
+          "Official Company Website Boost: +60",
+          "Penalty: Strong Name Mismatch: -50"
+        ]
+      },
+      "confidence": 49.9012,
+      "sourceName": "Company Website"
+    },
+    {
+      "data": {
+        "skills": [],
+        "source": "Company Website",
+        "company": "Cloud Destinations",
+        "fullName": "IT Services & Consulting in Malaysia",
+        "projects": [],
+        "education": [],
+        "companyBio": "Company\n                \n                  \n                    About Us\n                    Leadership Team\n                    Careers\n                    Announcements\n                    Contact Us",
+        "experience": [],
+        "designation": "Senior HRBP Lead",
+        "profileImage": "favicon.png",
+        "explainability": {
+          "penalties": [],
+          "confidence": 99,
+          "verification": "Likely Match 99%",
+          "matchedSignals": [
+            "Company",
+            "Designation"
+          ],
+          "missingSignals": [
+            "Full Name not matched"
+          ]
+        },
+        "publicProfiles": [
+          {
+            "url": "https://clouddestinations.com/malaysia.html",
+            "reasons": [
+              "Company Match: +25",
+              "Designation Match: +15",
+              "Official Company Website Boost: +60",
+              "Penalty: Strong Name Mismatch: -50"
+            ],
+            "platform": "Company Website",
+            "confidence": 49.9011
+          }
+        ],
+        "sourceConfidence": 49.9011,
+        "verificationStatus": "Unverified",
+        "verificationReasons": [
+          "Company Match: +25",
+          "Designation Match: +15",
+          "Official Company Website Boost: +60",
+          "Penalty: Strong Name Mismatch: -50"
+        ]
+      },
+      "confidence": 49.9011,
+      "sourceName": "Company Website"
+    },
+    {
+      "data": {
+        "skills": [],
+        "source": "Company Website",
+        "company": "Cloud Destinations",
+        "fullName": "Success Stories",
+        "projects": [],
+        "education": [],
+        "companyBio": "Company\n                \n                  \n                    About Us\n                    Leadership Team\n                    Careers\n                    Announcements\n                    Contact Us",
+        "experience": [],
+        "designation": "Senior HRBP Lead",
+        "profileImage": "favicon.png",
+        "explainability": {
+          "penalties": [],
+          "confidence": 99,
+          "verification": "Likely Match 99%",
+          "matchedSignals": [
+            "Company",
+            "Designation"
+          ],
+          "missingSignals": [
+            "Full Name not matched"
+          ]
+        },
+        "publicProfiles": [
+          {
+            "url": "https://clouddestinations.com/successstories.html",
+            "reasons": [
+              "Company Match: +25",
+              "Designation Match: +15",
+              "Official Company Website Boost: +60",
+              "Penalty: Strong Name Mismatch: -50"
+            ],
+            "platform": "Company Website",
+            "confidence": 49.90089999999999
+          }
+        ],
+        "sourceConfidence": 49.90089999999999,
+        "verificationStatus": "Unverified",
+        "verificationReasons": [
+          "Company Match: +25",
+          "Designation Match: +15",
+          "Official Company Website Boost: +60",
+          "Penalty: Strong Name Mismatch: -50"
+        ]
+      },
+      "confidence": 49.90089999999999,
+      "sourceName": "Company Website"
+    },
+    {
+      "data": {
+        "skills": [
+          "Abroad Exams",
+          "Top Courses",
+          "Exams",
+          "Read College Reviews",
+          "News",
+          "Admission Alerts 2026",
+          "Education Loan",
+          "Ask a Question",
+          "College Predictor",
+          "Test Series",
+          "Practice Questions",
+          "Course Finder",
+          "Scholarship",
+          "Articles",
+          "All Courses"
+        ],
+        "source": "Portfolio Scraper",
+        "fullName": "Saranya Muruganantham",
+        "projects": [
+          {
+            "name": "IISER IAT Exam Dates 2026",
+            "description": "Indian Institute of Science Education and Research Thiruvananthapuram, Kerala (IISER TVM ) is an autonomous institution, established in the year 2008."
+          },
+          {
+            "name": "IISER TVM Courses & Fees 2026",
+            "description": "IISER TVM offers various courses in UG, PG and Doctorate Courses in multiple specialisations. The Popular course that they offer is BS+ MS in over 8 s"
+          },
+          {
+            "name": "IISER TVM PG Courses & Fees 2026",
+            "description": "IISER TVM offers various courses in UG, PG and Doctorate Courses in multiple specialisations. The Popular course that they offer is BS+ MS in over 8 s"
+          },
+          {
+            "name": "IISER TVM PhD Courses & Fees 2026",
+            "description": "IISER TVM offers various courses in UG, PG and Doctorate Courses in multiple specialisations. The Popular course that they offer is BS+ MS in over 8 s"
+          },
+          {
+            "name": "IISER TVM UG Admissions 2026",
+            "description": "IISER TVM  offers admissions to UG, PG and Doctoral programs to all the eligible candidates. Admission to the IISER TVM UG Course is based on the Comm"
+          },
+          {
+            "name": "IISER TVM PG Admissions 2026",
+            "description": "IISER TVM  offers admissions to UG, PG and Doctoral programs to all the eligible candidates. Admission to the IISER TVM UG Course is based on the Comm"
+          },
+          {
+            "name": "IISER TVM PhD Admission 2026",
+            "description": "IISER TVM  offers admissions to UG, PG and Doctoral programs to all the eligible candidates. Admission to the IISER TVM UG Course is based on the Comm"
+          },
+          {
+            "name": "IISER TVM UG Admission Process 2026",
+            "description": "IISER TVM  offers admissions to UG, PG and Doctoral programs to all the eligible candidates. Admission to the IISER TVM UG Course is based on the Comm"
+          }
+        ],
+        "education": [],
+        "experience": [],
+        "technologies": [],
+        "explainability": {
+          "penalties": [
+            "Missing Identity Signals (-10)"
+          ],
+          "confidence": 40,
+          "verification": "Likely Match 40%",
+          "matchedSignals": [
+            "Full Name",
+            "Cross-platform Reference",
+            "Portfolio"
+          ],
+          "missingSignals": [
+            "Company mismatch",
+            "Designation not matched"
+          ]
+        },
+        "publicProfiles": [
+          {
+            "url": "https://collegedunia.com/college/9510-indian-institute-of-science-education-and-research-iiser-thiruvananthapuram",
+            "reasons": [
+              "Full Name Similarity: +35",
+              "Cross Platform References: +5",
+              "Portfolio Ownership: +10",
+              "Missing Identity Signals: -10",
+              "Γ£ö Portfolio Verification",
+              "AI Verification: The candidate has portfolio verification, but the URLs provided are unrelated to the person and lack company match and cross-platform consistency, making it an unlikely match."
+            ],
+            "platform": "Portfolio",
+            "confidence": 40.0002
+          },
+          {
+            "url": "https://www.twitter.com/college_dunia",
+            "platform": "Social"
+          }
+        ],
+        "sourceConfidence": 40.0002,
+        "verificationStatus": "Likely Match 40%",
+        "verificationReasons": [
+          "Full Name Similarity: +35",
+          "Cross Platform References: +5",
+          "Portfolio Ownership: +10",
+          "Missing Identity Signals: -10",
+          "Γ£ö Portfolio Verification",
+          "AI Verification: The candidate has portfolio verification, but the URLs provided are unrelated to the person and lack company match and cross-platform consistency, making it an unlikely match."
+        ]
+      },
+      "confidence": 40.0002,
+      "sourceName": "Portfolio Scraper"
+    }
+  ],
+  "mergedProfile": {
+    "skills": {
+      "value": [],
+      "source": "None",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 0,
+      "verification": "Unverified"
+    },
+    "company": {
+      "value": "Cloud Destinations",
+      "source": "LinkedIn URL Discovery",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 100,
+      "verification": "Verified"
+    },
+    "summary": {
+      "value": "Based on verified public information, Saranya Muruganantham is a seasoned human resources professional, currently serving as a Senior HRBP Lead at Cloud Destinations, with expertise in EXOps and HR leadership.",
+      "source": "LinkedIn URL Discovery",
+      "timestamp": "2026-08-12T13:10:08.279Z",
+      "confidence": 95,
+      "verification": "Verified"
+    },
+    "fullName": {
+      "value": "Saranya Muruganantham",
+      "source": "LinkedIn URL Discovery",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 100,
+      "verification": "Verified"
+    },
+    "headline": {
+      "value": "Saranya Muruganantham - EXOps & HR Leader",
+      "source": "LinkedIn URL Discovery",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 100,
+      "verification": "Verified"
+    },
+    "projects": {
+      "value": [],
+      "source": "None",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 0,
+      "verification": "Unverified"
+    },
+    "education": {
+      "value": [
+        {
+          "year": "Verified Academic Record",
+          "degree": "MBA",
+          "school": "Anna University",
+          "fieldOfStudy": "Human Resources & Management"
+        }
+      ],
+      "source": "AI Academic Extraction",
+      "timestamp": "2026-08-12T13:10:08.587Z",
+      "confidence": 85,
+      "verification": "Verified"
+    },
+    "interests": {
+      "value": [],
+      "source": "None",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 0,
+      "verification": "Unverified"
+    },
+    "languages": {
+      "value": [],
+      "source": "None",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 0,
+      "verification": "Unverified"
+    },
+    "experience": {
+      "value": [],
+      "source": "None",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 0,
+      "verification": "Unverified"
+    },
+    "designation": {
+      "value": "EXOps & HR Leader",
+      "source": "LinkedIn URL Discovery",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 100,
+      "verification": "Verified"
+    },
+    "achievements": {
+      "value": [],
+      "source": "None",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 0,
+      "verification": "Unverified"
+    },
+    "repositories": {
+      "value": [],
+      "source": "None",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 0,
+      "verification": "Unverified"
+    },
+    "technologies": {
+      "value": [],
+      "source": "None",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 0,
+      "verification": "Unverified"
+    },
+    "organizations": {
+      "value": [],
+      "source": "None",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 0,
+      "verification": "Unverified"
+    },
+    "searchProcess": {
+      "value": {
+        "SerpApi": "72 Results",
+        "GitHub API": "0 Results",
+        "Bing Search": "0 Results",
+        "Brave Search": "0 Results",
+        "Tavily Search": "0 Results",
+        "Company Website": "7 Results",
+        "DuckDuckGo Scraper": "0 Results",
+        "Google Custom Search": "0 Results"
+      },
+      "source": "Pipeline Log",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 100,
+      "verification": "Verified"
+    },
+    "certifications": {
+      "value": [],
+      "source": "None",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 0,
+      "verification": "Unverified"
+    },
+    "publicProfiles": {
+      "value": [
+        {
+          "url": "https://in.linkedin.com/in/saranya-muruganantham-695237142",
+          "reasons": [
+            "Full Name Similarity: +35",
+            "Company Match: +25",
+            "Professional Bio Similarity: +5",
+            "Γ£ö Strong Company Match",
+            "Γ£ö Cross-Platform Consistency",
+            "Γ£ö Portfolio Verification",
+            "Γ£ö Bio Matches BC Keywords",
+            "AI Verification: The candidate has a strong company match with 'Cloud Destinations', cross-platform consistency, portfolio verification, and bio matches business card keywords, indicating a high likelihood of being the correct person."
+          ],
+          "platform": "LinkedIn",
+          "confidence": 100
+        }
+      ],
+      "source": "LinkedIn URL Discovery",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 100,
+      "verification": "Verified"
+    },
+    "primaryLanguages": {
+      "value": [],
+      "source": "None",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 0,
+      "verification": "Unverified"
+    },
+    "pinnedRepositories": {
+      "value": [],
+      "source": "None",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 0,
+      "verification": "Unverified"
+    },
+    "scrapeCreatorsData": {
+      "value": [],
+      "source": "None",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 0,
+      "verification": "Unverified"
+    }
+  },
+  "sourceAttribution": {
+    "company": {
+      "value": "Cloud Destinations",
+      "source": "LinkedIn URL Discovery",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 100,
+      "verification": "Verified"
+    },
+    "summary": {
+      "value": "Based on verified public information, Saranya Muruganantham is a seasoned human resources professional, currently serving as a Senior HRBP Lead at Cloud Destinations, with expertise in EXOps and HR leadership.",
+      "source": "LinkedIn URL Discovery",
+      "timestamp": "2026-08-12T13:10:08.279Z",
+      "confidence": 95,
+      "verification": "Verified"
+    },
+    "fullName": {
+      "value": "Saranya Muruganantham",
+      "source": "LinkedIn URL Discovery",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 100,
+      "verification": "Verified"
+    },
+    "headline": {
+      "value": "Saranya Muruganantham - EXOps & HR Leader",
+      "source": "LinkedIn URL Discovery",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 100,
+      "verification": "Verified"
+    },
+    "education": {
+      "value": [
+        {
+          "year": "Verified Academic Record",
+          "degree": "MBA",
+          "school": "Anna University",
+          "fieldOfStudy": "Human Resources & Management"
+        }
+      ],
+      "source": "AI Academic Extraction",
+      "timestamp": "2026-08-12T13:10:08.587Z",
+      "confidence": 85,
+      "verification": "Verified"
+    },
+    "designation": {
+      "value": "EXOps & HR Leader",
+      "source": "LinkedIn URL Discovery",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 100,
+      "verification": "Verified"
+    },
+    "searchProcess": {
+      "value": {
+        "SerpApi": "72 Results",
+        "GitHub API": "0 Results",
+        "Bing Search": "0 Results",
+        "Brave Search": "0 Results",
+        "Tavily Search": "0 Results",
+        "Company Website": "7 Results",
+        "DuckDuckGo Scraper": "0 Results",
+        "Google Custom Search": "0 Results"
+      },
+      "source": "Pipeline Log",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 100,
+      "verification": "Verified"
+    },
+    "publicProfiles": {
+      "value": [
+        {
+          "url": "https://in.linkedin.com/in/saranya-muruganantham-695237142",
+          "reasons": [
+            "Full Name Similarity: +35",
+            "Company Match: +25",
+            "Professional Bio Similarity: +5",
+            "Γ£ö Strong Company Match",
+            "Γ£ö Cross-Platform Consistency",
+            "Γ£ö Portfolio Verification",
+            "Γ£ö Bio Matches BC Keywords",
+            "AI Verification: The candidate has a strong company match with 'Cloud Destinations', cross-platform consistency, portfolio verification, and bio matches business card keywords, indicating a high likelihood of being the correct person."
+          ],
+          "platform": "LinkedIn",
+          "confidence": 100
+        }
+      ],
+      "source": "LinkedIn URL Discovery",
+      "timestamp": "2026-08-12T13:10:07.888Z",
+      "confidence": 100,
+      "verification": "Verified"
+    }
+  },
+  "verificationConfidence": 100,
+  "verificationStatus": "Verified",
+  "providersUsed": [
+    "LinkedIn URL Discovery",
+    "Portfolio Scraper",
+    "Company Website"
+  ],
+  "enrichmentStatus": "COMPLETED",
+  "createdAt": "2026-08-12T13:09:01.766Z",
+  "updatedAt": "2026-08-12T13:10:10.380Z"
+}

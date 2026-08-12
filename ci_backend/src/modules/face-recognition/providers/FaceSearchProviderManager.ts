@@ -109,8 +109,8 @@ export class FaceSearchProviderManager {
         try {
           logger.info(`[FaceSearchProviderManager] Attempt ${attempt} search with provider: ${provider.name}`);
           
-          // Timeout set to 15 seconds per provider call
-          const response = await this.withTimeout(provider.search(imagePath), 15000, provider.name);
+          // Timeout set to 60 seconds per provider call to allow image processing and multiple fallback hosts
+          const response = await this.withTimeout(provider.search(imagePath), 60000, provider.name);
 
           if (response.success && response.candidates.length > 0) {
             logger.info(`[FaceSearchProviderManager] Success with ${provider.name}. Found ${response.candidates.length} candidates.`);

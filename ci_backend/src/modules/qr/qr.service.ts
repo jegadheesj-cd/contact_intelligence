@@ -32,7 +32,7 @@ export class QrService {
       }
 
       const decodedText = result.qr_data[0];
-      const qrFields = parseContactString(decodedText);
+      const qrFields = await parseContactString(decodedText);
       const ocrFields = result.structured || {};
 
       // Merge logic: QR data (vCard/URL) takes priority, missing fields fall back to OCR printed text
@@ -66,11 +66,11 @@ export class QrService {
     }
   }
 
-  public processQrText(decodedText: string) {
+  public async processQrText(decodedText: string) {
     if (!decodedText) {
       throw new AppError('No QR text provided', 400);
     }
-    const parsedFields = parseContactString(decodedText);
+    const parsedFields = await parseContactString(decodedText);
     return {
       decodedText,
       parsedFields,

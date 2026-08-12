@@ -15,13 +15,13 @@ export class SearchQueryBuilder {
     const { name, company } = signals;
     const queries: string[] = [];
     if (name && company) {
+      queries.push(`"${name}" "${company}" LinkedIn profile`);
       queries.push(`site:linkedin.com/in "${name}" "${company}"`);
-      queries.push(`site:linkedin.com/in ${name} ${company}`);
     } else if (name) {
+      queries.push(`"${name}" LinkedIn profile`);
       queries.push(`site:linkedin.com/in "${name}"`);
-      queries.push(`site:linkedin.com/in ${name}`);
     } else if (company) {
-      queries.push(`site:linkedin.com/in "${company}"`);
+      queries.push(`"${company}" LinkedIn profile`);
     }
     return queries;
   }

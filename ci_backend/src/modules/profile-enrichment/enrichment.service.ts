@@ -224,11 +224,11 @@ export class ProfileEnrichmentService {
       return false; // Reject: Belongs to a different person
     });
 
-    // ─── NEW: PhantomBuster Deep Enrichment ───
-    if (bestVerification.isVerified && bestCandidate) {
+    // 🧠 NEW: PhantomBuster Deep Enrichment 🧠
+    if (bestCandidate) {
       const linkedInProfile = bestCandidate.publicProfiles.find((p: any) => p.platform.toLowerCase() === 'linkedin');
       if (linkedInProfile && linkedInProfile.url) {
-        logger.info(`[DiscoveryPipeline] Verified LinkedIn URL found: ${linkedInProfile.url}. Triggering PhantomBuster.`);
+        logger.info(`[DiscoveryPipeline] Best LinkedIn URL found: ${linkedInProfile.url}. Triggering PhantomBuster.`);
         
         // Invoke PhantomBuster
         const pbProfile = await phantomBusterEnricher.enrichProfile(linkedInProfile.url);
@@ -358,7 +358,7 @@ Skills/Tech: ${JSON.stringify(skills)}
 Projects/Repos: ${JSON.stringify(repos)}
 ${kgEntity ? `Google Knowledge Graph Info: ${JSON.stringify(kgEntity)}` : ''}`;
 
-        const aiSummary = await generateTextWithFallback(summaryPrompt, 'gemini-1.5-pro', 'Professional Summary');
+        const aiSummary = await generateTextWithFallback(summaryPrompt, 'gemini-1.5-flash', 'Professional Summary');
         mergedProfile.summary = {
           value: aiSummary.trim(),
           source: bestCandidate.source,

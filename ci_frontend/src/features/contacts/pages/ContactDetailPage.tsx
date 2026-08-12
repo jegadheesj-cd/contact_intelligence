@@ -179,19 +179,39 @@ export const ContactDetailPage: React.FC = () => {
     return parseBiography(bioText);
   }, [contact, aiProfile]);
 
+  // Get the best matched candidate for dynamic UI updates
+  const bestMatchedCandidate = useMemo(() => {
+    const responses = contact?.professionalProfile?.providerResponses;
+    if (responses && Array.isArray(responses)) {
+      // Find highest confidence candidate
+      const sorted = [...responses]
+        .filter(r => r.success !== false && r.confidence > 0)
+        .sort((a, b) => b.confidence - a.confidence);
+      
+      return sorted[0]?.data;
+    }
+    return null;
+  }, [contact]);
+
   const experiencesToDisplay = useMemo(() => {
+    if (bestMatchedCandidate?.experience && bestMatchedCandidate.experience.length > 0) {
+      return bestMatchedCandidate.experience;
+    }
     if (aiProfile?.experience && aiProfile.experience.length > 0) {
       return aiProfile.experience;
     }
     return parsedBio.experience;
-  }, [aiProfile?.experience, parsedBio.experience]);
+  }, [bestMatchedCandidate, aiProfile?.experience, parsedBio.experience]);
 
   const educationToDisplay = useMemo(() => {
+    if (bestMatchedCandidate?.education && bestMatchedCandidate.education.length > 0) {
+      return bestMatchedCandidate.education;
+    }
     if (aiProfile?.education && aiProfile.education.length > 0) {
       return aiProfile.education;
     }
     return parsedBio.education;
-  }, [aiProfile?.education, parsedBio.education]);
+  }, [bestMatchedCandidate, aiProfile?.education, parsedBio.education]);
 
   if (isLoading) {
     return (
@@ -1660,43 +1680,87 @@ export const ContactDetailPage: React.FC = () => {
                 </div>
               )}
 
-              {/* About candidate biography */}
-              {(selectedCandidate.summary || selectedCandidate.companyBio) && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Structured Biography</h4>
-                    <p className="text-xs text-slate-700 leading-relaxed font-semibold bg-slate-50 p-4 border border-slate-100 rounded-xl whitespace-pre-line" style={{ whiteSpace: 'pre-line' }}>
-                      {formatGroundedBio(selectedCandidate.summary || selectedCandidate.companyBio, selectedCandidate.experience, selectedCandidate.education, selectedCandidate.designation || selectedCandidate.headline || selectedCandidate.companyRole, selectedCandidate.company)}
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Raw Biography Text</h4>
-                    <p className="text-xs text-slate-600 leading-relaxed font-medium bg-slate-50/50 p-4 border border-slate-100 rounded-xl">
-                      {selectedCandidate.summary || selectedCandidate.companyBio}
-                    </p>
+              {/* About / Structured text */}
+              {(selectedCandidate.summary || selectedCandidate.about || selectedCandidate.companyBio) && (
+                <div className="space-y-4 pt-2">
+                  <h4 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-3 flex items-center gap-2">
+                    About
+                  </h4>
+                  <p className="text-xs text-slate-700 leading-relaxed font-semibold whitespace-pre-line bg-slate-50 p-4 border border-slate-100 rounded-xl">
+                    {selectedCandidate.summary || selectedCandidate.about || selectedCandidate.companyBio}
+                  </p>
+                </div>
+              )}
+
+              {/* Raw Biography Text / Activities */}
+              {(selectedCandidate.activities || selectedCandidate.recentPosts || selectedCandidate.posts || selectedCandidate.rawText) && (
+                <div className="space-y-4 pt-2">
+                  <h4 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-3 flex items-center gap-2">
+                    Recent Activities & Posts
+                  </h4>
+                  <div className="text-xs text-slate-600 leading-relaxed font-medium bg-slate-50/50 p-4 border border-slate-100 rounded-xl max-h-64 overflow-y-auto whitespace-pre-wrap">
+                    {typeof selectedCandidate.activities === 'string' ? selectedCandidate.activities : 
+                     Array.isArray(selectedCandidate.activities) ? selectedCandidate.activities.map((a: any) => typeof a === 'string' ? a : JSON.stringify(a)).join('\n\n') : 
+                     selectedCandidate.recentPosts ? (typeof selectedCandidate.recentPosts === 'string' ? selectedCandidate.recentPosts : JSON.stringify(selectedCandidate.recentPosts, null, 2)) : 
+                     selectedCandidate.posts ? (typeof selectedCandidate.posts === 'string' ? selectedCandidate.posts : JSON.stringify(selectedCandidate.posts, null, 2)) : 
+                     selectedCandidate.rawText || 'No recent activities or posts found.'}
                   </div>
                 </div>
               )}
 
               {/* Career timeline */}
               {selectedCandidate.experience && selectedCandidate.experience.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                    <Briefcase className="h-3.5 w-3.5" /> Experience
+                <div className="space-y-4 pt-2">
+                  <h4 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-3 flex items-center gap-2">
+                    Experience
                   </h4>
-                  <div className="relative border-l border-slate-100 pl-4 ml-2 space-y-4">
-                    {selectedCandidate.experience.map((exp: any, idx: number) => (
-                      <div key={idx} className="relative flex flex-col gap-0.5">
-                        <span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-slate-450 border-2 border-white" />
-                        <h5 className="text-xs font-bold text-slate-800">{exp.title}</h5>
-                        <p className="text-[10px] text-slate-500 font-bold">
-                          <span className="text-indigo-650">{exp.company}</span> • <span>{exp.period}</span>
-                        </p>
-                        {exp.description && (
-                          <p className="text-[10px] text-slate-450 font-medium leading-relaxed mt-1">{exp.description}</p>
-                        )}
-                      </div>
-                    ))}
+                  <div className="space-y-6">
+                    {selectedCandidate.experience.map((exp: any, idx: number) => {
+                      const companyInitial = exp.company ? exp.company.charAt(0).toUpperCase() : <Briefcase className="h-5 w-5 text-slate-400" />;
+                      return (
+                        <div key={idx} className="flex items-start gap-4 pb-6 border-b border-slate-100 last:border-0 last:pb-0">
+                          {/* Company Logo Placeholder */}
+                          <div className="w-12 h-12 shrink-0 bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 font-bold text-xl shadow-sm">
+                            {exp.logoUrl ? (
+                              <img src={exp.logoUrl} alt={exp.company} className="w-full h-full object-contain bg-white" />
+                            ) : (
+                              companyInitial
+                            )}
+                          </div>
+                          
+                          {/* Details */}
+                          <div className="flex-1 min-w-0">
+                            <h5 className="text-sm font-bold text-slate-900 leading-snug">{exp.title}</h5>
+                            <p className="text-xs text-slate-700 font-medium mt-0.5">
+                              {exp.company}{exp.employmentType ? ` · ${exp.employmentType}` : ''}
+                            </p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              {exp.period || exp.duration}
+                              {exp.location ? ` · ${exp.location}` : ''}
+                            </p>
+                            
+                            {exp.description && (
+                              <div className="mt-3 text-xs text-slate-700 leading-relaxed whitespace-pre-line">
+                                {exp.description}
+                              </div>
+                            )}
+
+                            {exp.skills && exp.skills.length > 0 && (
+                              <div className="mt-3 text-[11px] font-bold text-slate-700 flex items-center gap-2">
+                                <div className="w-2 h-2 border-[1.5px] border-slate-600 rotate-45 shrink-0 ml-0.5" />
+                                <span>
+                                  {typeof exp.skills === 'string' 
+                                    ? exp.skills 
+                                    : Array.isArray(exp.skills) 
+                                      ? exp.skills.join(', ') 
+                                      : ''}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

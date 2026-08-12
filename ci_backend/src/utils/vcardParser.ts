@@ -2,6 +2,8 @@
  * Parses raw vCard string payloads into structured contact objects.
  * Handles base fields (FN, N, ORG, TITLE, EMAIL, TEL, URL, ADR) and parameters.
  */
+import { generateTextWithFallback } from './aiClient';
+
 export function parseVCard(vcard: string): {
   name?: string;
   company?: string;
@@ -165,7 +167,7 @@ export function parseWhatsAppUrl(url: string): { phone?: string; website?: strin
 /**
  * Unified contact parser wrapper for vCard, MeCard, WhatsApp, MATMSG, mailto, URL, email, and plain text.
  */
-export function parseContactString(payload: string): {
+export async function parseContactString(payload: string): Promise<{
   name?: string;
   company?: string;
   designation?: string;
@@ -174,7 +176,7 @@ export function parseContactString(payload: string): {
   website?: string;
   address?: string;
   linkedin_url?: string;
-} {
+}> {
   const trimmed = payload.trim();
   if (trimmed.toUpperCase().includes('BEGIN:VCARD')) {
     return parseVCard(trimmed);
@@ -201,5 +203,42 @@ export function parseContactString(payload: string): {
   if (trimmed.includes('@') && !trimmed.includes(' ')) {
     return { email: trimmed };
   }
-  return { name: trimmed };
+  
+  try {
+    const prompt = `You are a contact data extractor. The following text was scanned from a QR code.
+Extract the person's name, company, designation, email, phone, website, address, and linkedin_url if present.
+Text:
+${trimmed}
+
+Respond strictly in JSON format matching this structure:
+{
+  "name": "",
+  "company": "",
+  "designation": "",
+  "email": "",
+  "phone": "",
+  "website": "",
+  "address": "",
+  "linkedin_url": ""
+}
+Only output valid JSON without markdown wrapping. Leave fields empty string if not found.`;
+
+    const response = await generateTextWithFallback(prompt, 'gemini-1.5-flash', 'QR Text Parsing');
+    const jsonStr = response.replace(/```json/gi, '').replace(/```/gi, '').trim();
+    const parsed = JSON.parse(jsonStr);
+    
+    const result: any = {};
+    if (parsed.name) result.name = parsed.name;
+    if (parsed.company) result.company = parsed.company;
+    if (parsed.designation) result.designation = parsed.designation;
+    if (parsed.email) result.email = parsed.email;
+    if (parsed.phone) result.phone = parsed.phone;
+    if (parsed.website) result.website = parsed.website;
+    if (parsed.address) result.address = parsed.address;
+    if (parsed.linkedin_url) result.linkedin_url = parsed.linkedin_url;
+    
+    return Object.keys(result).length > 0 ? result : { name: trimmed };
+  } catch (err) {
+    return { name: trimmed };
+  }
 }

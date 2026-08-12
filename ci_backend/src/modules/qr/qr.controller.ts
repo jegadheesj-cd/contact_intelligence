@@ -27,7 +27,7 @@ export class QrController {
       if (!decodedText) {
         throw new AppError('No decodedText provided in request body', 400);
       }
-      const data = qrService.processQrText(decodedText);
+      const data = await qrService.processQrText(decodedText);
       res.status(200).json({
         success: true,
         message: 'QR Code text processed successfully',

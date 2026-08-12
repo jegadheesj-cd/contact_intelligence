@@ -300,7 +300,7 @@ Example Output:
 
 Return ONLY the JSON array. Do not include markdown formatting or backticks.`;
 
-    const responseText = await generateTextWithFallback(prompt, 'gemini-1.5-pro', 'OCR Validation');
+    const responseText = await generateTextWithFallback(prompt, 'gemini-1.5-flash', 'OCR Validation');
     const cleanedJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
     const parsedArray = JSON.parse(cleanedJson) as ContactUnderstandingField[];
 
