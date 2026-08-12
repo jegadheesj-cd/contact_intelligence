@@ -6,6 +6,9 @@ export interface VerifiedField<T> {
   verification: 'Verified' | 'Unverified';
 }
 
+import logger from '../../../config/logger';
+import { BiographyExtractionEngine } from './BiographyExtractionEngine';
+
 export interface MergedProfile {
   fullName: VerifiedField<string>;
   headline?: VerifiedField<string>;
@@ -393,9 +396,79 @@ export class ProfileMergeService {
       }
     }
 
+    // ─── NEW: Extract structured data from summary text as fallback ───
+    // If experience/education/organizations/volunteer are still empty, extract from summary
+    this.extractAndPopulateMissingData(mergedProfile, sourceAttribution, timestamp);
+
     return {
       mergedProfile: mergedProfile as MergedProfile,
       sourceAttribution
     };
+  }
+
+  /**
+   * If critical fields are still empty after merging, extract them from summary text
+   */
+  private extractAndPopulateMissingData(mergedProfile: any, sourceAttribution: Record<string, any>, timestamp: string): void {
+    const engine = new BiographyExtractionEngine();
+    
+    // Get summary text to extract from
+    const summaryText = mergedProfile.summary?.value || '';
+    if (!summaryText || summaryText.length < 20) return;
+
+    // Extract structured data
+    const extracted = engine.extractFromBiography(summaryText);
+
+    // Populate experience if empty
+    if ((!mergedProfile.experience?.value || mergedProfile.experience.value.length === 0) && extracted.experience.length > 0) {
+      mergedProfile.experience = {
+        value: extracted.experience,
+        source: 'Biography Extraction',
+        confidence: 65,
+        timestamp,
+        verification: 'Unverified'
+      };
+      sourceAttribution.experience = mergedProfile.experience;
+      logger.info(`[ProfileMergeService] Populated ${extracted.experience.length} experience entries from summary extraction`);
+    }
+
+    // Populate education if empty
+    if ((!mergedProfile.education?.value || mergedProfile.education.value.length === 0) && extracted.education.length > 0) {
+      mergedProfile.education = {
+        value: extracted.education,
+        source: 'Biography Extraction',
+        confidence: 65,
+        timestamp,
+        verification: 'Unverified'
+      };
+      sourceAttribution.education = mergedProfile.education;
+      logger.info(`[ProfileMergeService] Populated ${extracted.education.length} education entries from summary extraction`);
+    }
+
+    // Populate organizations if empty
+    if ((!mergedProfile.organizations?.value || mergedProfile.organizations.value.length === 0) && extracted.organizations.length > 0) {
+      mergedProfile.organizations = {
+        value: extracted.organizations,
+        source: 'Biography Extraction',
+        confidence: 60,
+        timestamp,
+        verification: 'Unverified'
+      };
+      sourceAttribution.organizations = mergedProfile.organizations;
+      logger.info(`[ProfileMergeService] Populated ${extracted.organizations.length} organization entries from summary extraction`);
+    }
+
+    // Populate volunteerExperience if empty
+    if ((!mergedProfile.volunteerExperience?.value || mergedProfile.volunteerExperience.value.length === 0) && extracted.volunteerExperience.length > 0) {
+      mergedProfile.volunteerExperience = {
+        value: extracted.volunteerExperience,
+        source: 'Biography Extraction',
+        confidence: 60,
+        timestamp,
+        verification: 'Unverified'
+      };
+      sourceAttribution.volunteerExperience = mergedProfile.volunteerExperience;
+      logger.info(`[ProfileMergeService] Populated ${extracted.volunteerExperience.length} volunteer entries from summary extraction`);
+    }
   }
 }
