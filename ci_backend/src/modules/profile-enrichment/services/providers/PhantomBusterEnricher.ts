@@ -31,8 +31,7 @@ export class PhantomBusterEnricher {
         {
           id: this.agentId,
           bonusArgument: {
-            profileUrls: [linkedInUrl],
-            spreadsheetUrl: linkedInUrl
+            profileUrls: [linkedInUrl]
           }
         },
         {
@@ -46,11 +45,10 @@ export class PhantomBusterEnricher {
       const containerId = launchRes.data.containerId;
       logger.info(`[PhantomBusterEnricher] Agent launched successfully. Container ID: ${containerId}`);
 
-      // 2. Poll for completion (Max ~60 seconds)
+      // 2. Poll for completion (Max ~90 seconds)
       let attempts = 0;
-      let outputUrl = null;
       
-      while (attempts < 12) {
+      while (attempts < 18) {
         await new Promise(resolve => setTimeout(resolve, 5000)); // 5s interval
         
         const statusRes = await axios.get(`${this.apiUrl}/containers/fetch`, {
@@ -59,19 +57,109 @@ export class PhantomBusterEnricher {
         });
 
         const status = statusRes.data.status;
+        logger.info(`[PhantomBusterEnricher] Container status check #${attempts + 1}: ${status}`);
+        
         if (status === 'finished') {
-          logger.info(`[PhantomBusterEnricher] Container finished. Fetching output logs...`);
-          const outputRes = await axios.get(`${this.apiUrl}/containers/fetch-output`, {
-            params: { id: containerId },
-            headers: { 'x-phantombuster-key': this.apiKey }
-          });
+          logger.info(`[PhantomBusterEnricher] Container finished. Fetching result data...`);
           
-          if (outputRes.data.outputUrl) {
-            outputUrl = outputRes.data.outputUrl;
-          } else if (outputRes.data.resultObject) {
-             return this.mapToCandidateProfile(outputRes.data.resultObject, linkedInUrl);
+          // Strategy 1: Fetch structured result object from the container
+          try {
+            const resultRes = await axios.get(`${this.apiUrl}/containers/fetch-result-object`, {
+              params: { id: containerId },
+              headers: { 'x-phantombuster-key': this.apiKey }
+            });
+            logger.info(`[PhantomBusterEnricher] fetch-result-object response keys: ${JSON.stringify(Object.keys(resultRes.data || {}))}`);
+            
+            if (resultRes.data && resultRes.data.resultObject) {
+              const resultObj = typeof resultRes.data.resultObject === 'string' 
+                ? JSON.parse(resultRes.data.resultObject) 
+                : resultRes.data.resultObject;
+              
+              if (Array.isArray(resultObj) && resultObj.length > 0) {
+                logger.info(`[PhantomBusterEnricher] Got result object array with ${resultObj.length} items.`);
+                return this.mapToCandidateProfile(resultObj[0], linkedInUrl);
+              } else if (resultObj && typeof resultObj === 'object' && !Array.isArray(resultObj)) {
+                logger.info(`[PhantomBusterEnricher] Got single result object.`);
+                return this.mapToCandidateProfile(resultObj, linkedInUrl);
+              }
+            }
+          } catch (e: any) {
+            logger.warn(`[PhantomBusterEnricher] fetch-result-object failed: ${e.message}`);
           }
-          break;
+
+          // Strategy 2: Fetch agent-level output (result file URL)
+          try {
+            const agentOutputRes = await axios.get(`${this.apiUrl}/agents/fetch-output`, {
+              params: { id: this.agentId },
+              headers: { 'x-phantombuster-key': this.apiKey }
+            });
+            logger.info(`[PhantomBusterEnricher] agents/fetch-output response keys: ${JSON.stringify(Object.keys(agentOutputRes.data || {}))}`);
+            
+            const s3Folder = agentOutputRes.data.s3Folder;
+            const resultObject = agentOutputRes.data.resultObject;
+            const outputUrl = agentOutputRes.data.output;
+            
+            // Try resultObject first
+            if (resultObject) {
+              const parsed = typeof resultObject === 'string' ? JSON.parse(resultObject) : resultObject;
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                logger.info(`[PhantomBusterEnricher] Got agent resultObject with ${parsed.length} items.`);
+                return this.mapToCandidateProfile(parsed[0], linkedInUrl);
+              } else if (parsed && typeof parsed === 'object') {
+                return this.mapToCandidateProfile(parsed, linkedInUrl);
+              }
+            }
+            
+            // Try s3Folder for CSV/JSON result file
+            if (s3Folder) {
+              const resultFileUrl = `https://phantombuster.s3.amazonaws.com/${s3Folder}/result.json`;
+              logger.info(`[PhantomBusterEnricher] Trying result file URL: ${resultFileUrl}`);
+              try {
+                const fileRes = await axios.get(resultFileUrl);
+                if (Array.isArray(fileRes.data) && fileRes.data.length > 0) {
+                  logger.info(`[PhantomBusterEnricher] Got result.json with ${fileRes.data.length} items.`);
+                  return this.mapToCandidateProfile(fileRes.data[0], linkedInUrl);
+                }
+              } catch (fileErr: any) {
+                // Try CSV fallback
+                const csvUrl = `https://phantombuster.s3.amazonaws.com/${s3Folder}/result.csv`;
+                logger.info(`[PhantomBusterEnricher] result.json not found. Trying: ${csvUrl}`);
+                try {
+                  const csvRes = await axios.get(csvUrl, { responseType: 'text' });
+                  const csvData = this.parseSimpleCsv(csvRes.data);
+                  if (csvData) {
+                    logger.info(`[PhantomBusterEnricher] Parsed CSV result successfully.`);
+                    return this.mapToCandidateProfile(csvData, linkedInUrl);
+                  }
+                } catch (csvErr: any) {
+                  logger.warn(`[PhantomBusterEnricher] CSV fallback also failed: ${csvErr.message}`);
+                }
+              }
+            }
+          } catch (e: any) {
+            logger.warn(`[PhantomBusterEnricher] agents/fetch-output failed: ${e.message}`);
+          }
+
+          // Strategy 3: Check container fetch-output for inline data
+          try {
+            const outputRes = await axios.get(`${this.apiUrl}/containers/fetch-output`, {
+              params: { id: containerId },
+              headers: { 'x-phantombuster-key': this.apiKey }
+            });
+            logger.info(`[PhantomBusterEnricher] containers/fetch-output keys: ${JSON.stringify(Object.keys(outputRes.data || {}))}`);
+            
+            if (outputRes.data.outputUrl) {
+              const jsonRes = await axios.get(outputRes.data.outputUrl);
+              if (Array.isArray(jsonRes.data) && jsonRes.data.length > 0) {
+                return this.mapToCandidateProfile(jsonRes.data[0], linkedInUrl);
+              }
+            }
+          } catch (e: any) {
+            logger.warn(`[PhantomBusterEnricher] containers/fetch-output failed: ${e.message}`);
+          }
+
+          logger.warn('[PhantomBusterEnricher] Container finished but no usable result data found across all strategies.');
+          return null;
         } else if (status === 'error' || status === 'canceled') {
           logger.error(`[PhantomBusterEnricher] Container failed or was canceled. Status: ${status}`);
           return null;
@@ -80,26 +168,33 @@ export class PhantomBusterEnricher {
         attempts++;
       }
 
-      if (!outputUrl) {
-        logger.warn('[PhantomBusterEnricher] Timeout waiting for PhantomBuster or no output URL returned.');
-        return null;
-      }
-
-      // 3. Fetch JSON results from outputUrl
-      const jsonRes = await axios.get(outputUrl);
-      const data = jsonRes.data; 
-      
-      // Usually an array of scraped objects
-      if (Array.isArray(data) && data.length > 0) {
-        logger.info(`[PhantomBusterEnricher] Successfully fetched and parsed enriched data.`);
-        return this.mapToCandidateProfile(data[0], linkedInUrl);
-      }
-      
-      logger.warn('[PhantomBusterEnricher] PhantomBuster returned empty array or invalid format.');
+      logger.warn('[PhantomBusterEnricher] Timeout waiting for PhantomBuster container to finish.');
       return null;
       
     } catch (error: any) {
       logger.error(`[PhantomBusterEnricher] Error during enrichment: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Simple CSV parser for PhantomBuster result files.
+   * Returns the first row as a key-value object using header row as keys.
+   */
+  private parseSimpleCsv(csvText: string): Record<string, any> | null {
+    try {
+      const lines = csvText.split('\n').filter(l => l.trim().length > 0);
+      if (lines.length < 2) return null;
+      
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      const values = lines[1].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+      
+      const obj: Record<string, any> = {};
+      for (let i = 0; i < headers.length; i++) {
+        obj[headers[i]] = values[i] || '';
+      }
+      return obj;
+    } catch {
       return null;
     }
   }

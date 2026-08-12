@@ -96,7 +96,13 @@ export class BiographyExtractionEngine {
         result.organizations.push(...orgsFromText);
       }
 
-      logger.debug(`[BiographyExtractionEngine] Extracted: ${result.experience.length} experiences, ${result.education.length} educations, ${result.organizations.length} organizations, ${result.volunteerExperience.length} volunteer records`);
+      // Sanitize: remove garbage entries (N/A, None, year-only, ### prefixed)
+      result.experience = this.sanitizeExperience(result.experience);
+      result.education = this.sanitizeEducation(result.education);
+      result.organizations = result.organizations.filter(o => this.isValidString(o.name));
+      result.volunteerExperience = result.volunteerExperience.filter(v => this.isValidString(v.name));
+
+      logger.debug(`[BiographyExtractionEngine] Extracted (after sanitize): ${result.experience.length} experiences, ${result.education.length} educations, ${result.organizations.length} organizations, ${result.volunteerExperience.length} volunteer records`);
       return result;
     } catch (err: any) {
       logger.warn(`[BiographyExtractionEngine] Error parsing biography: ${err.message}`);
@@ -430,10 +436,70 @@ export class BiographyExtractionEngine {
   }
 
   private splitEntries(content: string): string[] {
-    // Split by bullet points, line breaks, or other common separators
+    // Split by ### markdown headers, bullet points, or double line breaks
+    // Do NOT split by single dashes — they appear in date ranges and company names
+    if (content.includes('###')) {
+      return content.split(/###/).map(e => e.trim()).filter(e => e.length > 0);
+    }
     return content
-      .split(/[\n•–-]/)
+      .split(/[\n•]/)
       .filter(line => line.trim().length > 0);
+  }
+
+  /**
+   * Check if a string is a valid non-placeholder value.
+   */
+  private isValidString(val: string | undefined): boolean {
+    if (!val) return false;
+    const cleaned = val.replace(/^[#\s]+/, '').trim();
+    if (cleaned.length === 0) return false;
+    if (/^(n\/a|none|null|undefined|unknown|n\.a\.)$/i.test(cleaned)) return false;
+    // Pure year (e.g. "2016") is not a valid name/title
+    if (/^\d{4}$/.test(cleaned)) return false;
+    // Just a year range
+    if (/^\d{4}\s*[-–]\s*\d{4}$/.test(cleaned)) return false;
+    return true;
+  }
+
+  /**
+   * Sanitize experience entries — remove garbage records.
+   */
+  private sanitizeExperience(exps: ExtractedExperience[]): ExtractedExperience[] {
+    return exps.filter(exp => {
+      // Must have at least a valid title or company
+      const hasTitle = this.isValidString(exp.title);
+      const hasCompany = this.isValidString(exp.company);
+      if (!hasTitle && !hasCompany) return false;
+      
+      // Clean individual fields
+      if (exp.title && !this.isValidString(exp.title)) exp.title = '';
+      if (exp.company && !this.isValidString(exp.company)) exp.company = '';
+      
+      return true;
+    });
+  }
+
+  /**
+   * Sanitize education entries — remove garbage records.
+   */
+  private sanitizeEducation(edus: ExtractedEducation[]): ExtractedEducation[] {
+    return edus.filter(edu => {
+      // Must have at least a valid school or degree
+      const hasSchool = this.isValidString(edu.school);
+      const hasDegree = this.isValidString(edu.degree);
+      if (!hasSchool && !hasDegree) return false;
+      
+      // Clean individual fields
+      if (edu.school && !this.isValidString(edu.school)) edu.school = '';
+      if (edu.degree && !this.isValidString(edu.degree)) edu.degree = '';
+      if (edu.fieldOfStudy && !this.isValidString(edu.fieldOfStudy)) edu.fieldOfStudy = undefined;
+      
+      // Strip markdown ### prefixes from values
+      if (edu.school) edu.school = edu.school.replace(/^[#\s]+/, '').trim();
+      if (edu.degree) edu.degree = edu.degree.replace(/^[#\s]+/, '').trim();
+      
+      return true;
+    });
   }
 
   private isDateLine(line: string): boolean {

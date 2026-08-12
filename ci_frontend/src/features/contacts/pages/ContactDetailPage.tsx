@@ -194,19 +194,113 @@ export const ContactDetailPage: React.FC = () => {
     return parseBiography(bioText);
   }, [contact, aiProfile]);
 
-  const experiencesToDisplay = useMemo(() => {
-    if (aiProfile?.experience && aiProfile.experience.length > 0) {
-      return aiProfile.experience;
+  // Helper: check if a string is a real value (not N/A, None, etc.)
+  const isValidField = (val: string | undefined | null): boolean => {
+    if (!val) return false;
+    const cleaned = val.replace(/^[#\s]+/, '').trim();
+    if (cleaned.length === 0) return false;
+    if (/^(n\/a|none|null|undefined|unknown|n\.a\.)$/i.test(cleaned)) return false;
+    if (/^\d{4}$/.test(cleaned)) return false; // year only
+    if (/^\d{4}\s*[-–]\s*\d{4}$/.test(cleaned)) return false; // year range only
+    return true;
+  };
+
+  // Helper: filter valid experience entries
+  const filterValidExperience = (exps: any[]): any[] => {
+    return exps.filter((exp: any) => {
+      const hasTitle = isValidField(exp.title);
+      const hasCompany = isValidField(exp.company);
+      return hasTitle || hasCompany;
+    }).map((exp: any) => ({
+      ...exp,
+      title: isValidField(exp.title) ? exp.title?.replace(/^[#\s]+/, '').trim() : exp.title,
+      company: isValidField(exp.company) ? exp.company?.replace(/^[#\s]+/, '').trim() : exp.company,
+    }));
+  };
+
+  // Helper: filter valid education entries
+  const filterValidEducation = (edus: any[]): any[] => {
+    return edus.filter((edu: any) => {
+      const hasSchool = isValidField(edu.school);
+      const hasDegree = isValidField(edu.degree);
+      const hasField = isValidField(edu.fieldOfStudy);
+      return hasSchool || hasDegree || hasField;
+    }).map((edu: any) => ({
+      ...edu,
+      school: edu.school ? edu.school.replace(/^[#\s]+/, '').trim() : edu.school,
+      degree: edu.degree ? edu.degree.replace(/^[#\s]+/, '').trim() : edu.degree,
+    }));
+  };
+
+  // Extract experience & education from providerResponses candidates (same data as Expand Details)
+  const providerExperience = useMemo(() => {
+    if (!contact) return [];
+    const responses = contact.professionalProfile?.providerResponses || [];
+    const allExps: any[] = [];
+    const seen = new Set<string>();
+    // Sort by confidence descending
+    const sorted = [...responses].sort((a: any, b: any) => (b.confidence || 0) - (a.confidence || 0));
+    for (const resp of sorted) {
+      const data = resp.data || resp;
+      const exps = data.experience || [];
+      for (const exp of exps) {
+        const key = `${(exp.title || '').toLowerCase()}|${(exp.company || '').toLowerCase()}`;
+        if (!seen.has(key) && (isValidField(exp.title) || isValidField(exp.company))) {
+          seen.add(key);
+          allExps.push(exp);
+        }
+      }
     }
-    return parsedBio.experience;
-  }, [aiProfile?.experience, parsedBio.experience]);
+    return allExps;
+  }, [contact]);
+
+  const providerEducation = useMemo(() => {
+    if (!contact) return [];
+    const responses = contact.professionalProfile?.providerResponses || [];
+    const allEdus: any[] = [];
+    const seen = new Set<string>();
+    const sorted = [...responses].sort((a: any, b: any) => (b.confidence || 0) - (a.confidence || 0));
+    for (const resp of sorted) {
+      const data = resp.data || resp;
+      const edus = data.education || [];
+      for (const edu of edus) {
+        const key = `${(edu.school || '').toLowerCase()}|${(edu.degree || '').toLowerCase()}`;
+        if (!seen.has(key) && (isValidField(edu.school) || isValidField(edu.degree) || isValidField(edu.fieldOfStudy))) {
+          seen.add(key);
+          allEdus.push(edu);
+        }
+      }
+    }
+    return allEdus;
+  }, [contact]);
+
+  const experiencesToDisplay = useMemo(() => {
+    // 1. Try mergedProfile experience (filtered)
+    if (aiProfile?.experience && aiProfile.experience.length > 0) {
+      const valid = filterValidExperience(aiProfile.experience);
+      if (valid.length > 0) return valid;
+    }
+    // 2. Try providerResponses candidate experience
+    if (providerExperience.length > 0) {
+      return filterValidExperience(providerExperience);
+    }
+    // 3. Fallback to biography parsing
+    return filterValidExperience(parsedBio.experience);
+  }, [aiProfile?.experience, providerExperience, parsedBio.experience]);
 
   const educationToDisplay = useMemo(() => {
+    // 1. Try mergedProfile education (filtered)
     if (aiProfile?.education && aiProfile.education.length > 0) {
-      return aiProfile.education;
+      const valid = filterValidEducation(aiProfile.education);
+      if (valid.length > 0) return valid;
     }
-    return parsedBio.education;
-  }, [aiProfile?.education, parsedBio.education]);
+    // 2. Try providerResponses candidate education
+    if (providerEducation.length > 0) {
+      return filterValidEducation(providerEducation);
+    }
+    // 3. Fallback to biography parsing
+    return filterValidEducation(parsedBio.education);
+  }, [aiProfile?.education, providerEducation, parsedBio.education]);
 
   if (isLoading) {
     return (
