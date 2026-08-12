@@ -54,6 +54,7 @@ export interface Contact {
   experience?: string | null;
   education?: string | null;
   interests: string[];
+  overviewConfirmed?: boolean;
   createdAt: string;
   updatedAt: string;
   tags?: Tag[];
