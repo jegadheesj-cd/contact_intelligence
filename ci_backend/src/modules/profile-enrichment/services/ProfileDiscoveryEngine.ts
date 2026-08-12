@@ -15,14 +15,45 @@ export interface CandidateProfile {
   industry?: string;
   profileImage?: string;
   summary?: string;
-  experience: Array<{ title: string; company: string; period: string; description?: string }>;
-  education: Array<{ school: string; degree: string; year: string; fieldOfStudy?: string }>;
+  experience: Array<{ 
+    title: string; 
+    company: string; 
+    companyLogo?: string; 
+    period: string; 
+    startDate?: string; 
+    endDate?: string; 
+    isCurrent?: boolean; 
+    duration?: string; 
+    location?: string; 
+    description?: string; 
+    skills?: string[]; 
+  }>;
+  education: Array<{ 
+    school: string; 
+    degree?: string; 
+    year?: string; 
+    startDate?: string; 
+    endDate?: string; 
+    fieldOfStudy?: string; 
+    description?: string; 
+    activities?: string; 
+  }>;
   skills: string[];
   projects: Array<{ name: string; description: string; technologies?: string[]; duration?: string }>;
   certifications?: string[];
   achievements?: string[];
-  organizations?: string[];
-  volunteerExperience?: string[];
+  organizations?: Array<{ 
+    name: string; 
+    role?: string; 
+    period?: string; 
+    description?: string; 
+  }>;
+  volunteerExperience?: Array<{ 
+    name: string; 
+    role?: string; 
+    period?: string; 
+    description?: string; 
+  }>;
   publications?: string[];
   languages?: string[];
   interests?: string[];

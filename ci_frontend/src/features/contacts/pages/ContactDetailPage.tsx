@@ -40,7 +40,21 @@ import {
   MessageSquare,
   BookOpen,
   FolderGit2,
+  Heart,
+  Building2,
+  GraduationCap,
+  ArrowRight,
+  Shield,
+  Clock,
 } from 'lucide-react';
+
+const LinkedinIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
+    <rect width="4" height="12" x="2" y="9" />
+    <circle cx="4" cy="4" r="2" />
+  </svg>
+);
 
 const Instagram = (props: React.SVGProps<SVGSVGElement>) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -498,10 +512,17 @@ export const ContactDetailPage: React.FC = () => {
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-50/5 to-transparent pointer-events-none" />
         
         <div className="flex items-center gap-4 relative z-10">
-          <div className="h-16 w-16 rounded-2xl bg-gradient-to-tr from-indigo-100 to-purple-100 border border-indigo-200/60 text-indigo-700 flex items-center justify-center font-black text-xl tracking-wide shrink-0 shadow-xs relative">
-            <span className="absolute -top-1 -right-1 h-3.5 w-3.5 bg-emerald-500 border-2 border-white rounded-full" title="Active Contact" />
-            {initials}
-          </div>
+          {aiProfile?.profileImage ? (
+            <div className="h-16 w-16 rounded-2xl border border-indigo-200/60 shrink-0 shadow-xs relative overflow-hidden">
+              <img src={aiProfile.profileImage} alt={contact.name} className="h-full w-full object-cover" onError={(e) => { (e.target as any).style.display = 'none'; (e.target as any).parentElement.innerHTML = `<div class="h-16 w-16 rounded-2xl bg-gradient-to-tr from-indigo-100 to-purple-100 text-indigo-700 flex items-center justify-center font-black text-xl">${initials}</div>`; }} />
+              <span className="absolute -top-1 -right-1 h-3.5 w-3.5 bg-emerald-500 border-2 border-white rounded-full" title="Active Contact" />
+            </div>
+          ) : (
+            <div className="h-16 w-16 rounded-2xl bg-gradient-to-tr from-indigo-100 to-purple-100 border border-indigo-200/60 text-indigo-700 flex items-center justify-center font-black text-xl tracking-wide shrink-0 shadow-xs relative">
+              <span className="absolute -top-1 -right-1 h-3.5 w-3.5 bg-emerald-500 border-2 border-white rounded-full" title="Active Contact" />
+              {initials}
+            </div>
+          )}
           <div className="overflow-hidden">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-black text-slate-900 leading-tight truncate">{contact.name}</h1>
@@ -584,28 +605,36 @@ export const ContactDetailPage: React.FC = () => {
       )}
 
       {/* Tabs navigation bar */}
+      {(() => {
+        const isConfirmed = contact.overviewConfirmed || (contact.professionalProfile && !['PENDING'].includes(contact.professionalProfile.enrichmentStatus || 'PENDING'));
+        const tabs = [
+          { key: 'overview', label: 'Overview', locked: false },
+          { key: 'discovery', label: 'Profile Discovery', locked: !isConfirmed },
+          { key: 'career', label: 'Experience & Education', locked: !isConfirmed },
+          { key: 'ai', label: '✨ AI Intelligence', locked: !isConfirmed },
+          { key: 'activity', label: 'Activity & Notes', locked: !isConfirmed },
+        ];
+        return (
       <div className="border-b border-slate-200 flex gap-4 shrink-0 overflow-x-auto">
-        {[
-          { key: 'overview', label: 'Overview' },
-          { key: 'career', label: 'Experience & Education' },
-          { key: 'ai', label: '✨ AI Intelligence' },
-          { key: 'discovery', label: 'Profile Discovery' },
-          { key: 'activity', label: 'Activity & Notes' },
-        ].map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key as any)}
+            onClick={() => { if (!tab.locked) setActiveTab(tab.key as any); }}
+            disabled={tab.locked}
             className={`py-2 px-1 text-xs font-bold uppercase tracking-wider border-b-2 outline-none transition-all whitespace-nowrap
-              ${
+              ${tab.locked ? 'border-transparent text-slate-300 cursor-not-allowed opacity-50' :
                 activeTab === tab.key
                   ? tab.key === 'ai' ? 'border-purple-600 text-purple-700' : 'border-indigo-650 text-indigo-650'
                   : tab.key === 'ai' ? 'border-transparent text-purple-400 hover:text-purple-650' : 'border-transparent text-slate-450 hover:text-slate-650'
               }`}
           >
+            {tab.locked && <Shield className="h-3 w-3 inline mr-1 opacity-40" />}
             {tab.label}
           </button>
         ))}
       </div>
+        );
+      })()}
 
       {/* MAIN CONTAINER */}
       <div className="flex-1 flex flex-col min-h-[420px]">
@@ -628,6 +657,14 @@ export const ContactDetailPage: React.FC = () => {
                   {renderInlineEditRow('phone', 'Phone Number', <Phone className="h-3.5 w-3.5 text-slate-400" />, contact.phone)}
                   {renderInlineEditRow('website', 'Website URL', <Globe className="h-3.5 w-3.5 text-slate-400" />, contact.website)}
                   {renderInlineEditRow('address', 'Location / Address', <MapPin className="h-3.5 w-3.5 text-slate-400" />, contact.address)}
+                  {renderInlineEditRow('linkedInUrl', 'LinkedIn URL', <LinkedinIcon className="h-3.5 w-3.5 text-slate-400" />, (() => {
+                    const profiles = aiProfile?.publicProfiles;
+                    if (Array.isArray(profiles)) {
+                      const li = profiles.find((p: any) => p.platform === 'LinkedIn');
+                      return li?.url || '';
+                    }
+                    return '';
+                  })())}
                 </div>
               </div>
 
@@ -807,6 +844,57 @@ export const ContactDetailPage: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Confirm & Proceed CTA */}
+            {(() => {
+              const isConfirmed = contact.overviewConfirmed || (contact.professionalProfile && !['PENDING'].includes(contact.professionalProfile?.enrichmentStatus || 'PENDING'));
+              if (isConfirmed) return null;
+              return (
+                <div className="lg:col-span-12">
+                  <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600 shrink-0">
+                        <Shield className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-slate-800">Confirm Contact Details</h3>
+                        <p className="text-xs text-slate-500 mt-1 font-semibold max-w-md">
+                          Verify the contact's basic credentials above, then proceed to trigger profile discovery and AI enrichment.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!id) return;
+                        if (isPipelineActive || enrichMutation.isPending) return;
+                        try {
+                          await updateContactMutation.mutateAsync({ id, data: { overviewConfirmed: true } });
+                          addToast('Contact confirmed. Triggering profile enrichment...', 'success');
+                          setActiveTab('discovery');
+                          if (enrichmentStatus === 'PENDING') {
+                            await enrichMutation.mutateAsync(id);
+                            setIsEnrichmentActive(true);
+                          }
+                        } catch (err: any) {
+                          addToast(err.message || 'Failed to confirm contact.', 'error');
+                        }
+                      }}
+                      disabled={isPipelineActive || enrichMutation.isPending}
+                      className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-black transition-all shadow-sm cursor-pointer
+                        ${isPipelineActive || enrichMutation.isPending
+                          ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          : 'bg-indigo-600 hover:bg-indigo-700 text-white hover:shadow-md'}`}
+                    >
+                      {isPipelineActive || enrichMutation.isPending ? (
+                        <><Loader2 className="h-4 w-4 animate-spin" /> Processing...</>
+                      ) : (
+                        <><ArrowRight className="h-4 w-4" /> Confirm & Proceed</>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -816,28 +904,86 @@ export const ContactDetailPage: React.FC = () => {
             
             {/* Left Column: Timelines */}
             <div className="lg:col-span-8 flex flex-col gap-6">
-              {/* Career Timeline */}
+              {/* Grouped Career Timeline */}
               <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs">
                 <h2 className="text-xs font-bold text-slate-800 tracking-wider uppercase border-b border-slate-50 pb-2 mb-4 flex items-center gap-2">
                   <Briefcase className="h-4 w-4 text-indigo-500" /> Career History {renderBadge('experience')}
                 </h2>
                 
                 {experiencesToDisplay && experiencesToDisplay.length > 0 ? (
-                  <div className="relative border-l-2 border-slate-100 pl-5 ml-2.5 space-y-6 py-2">
-                    {experiencesToDisplay.map((exp: any, idx: number) => (
-                      <div key={idx} className="relative flex flex-col gap-1 animate-slide-up opacity-0" style={{ animationDelay: `${idx * 40}ms`, animationFillMode: 'forwards' }}>
-                        <span className="absolute -left-[26px] top-1.5 h-3.5 w-3.5 rounded-full bg-indigo-500 border-2 border-white shadow-sm" />
-                        <h3 className="text-xs font-bold text-slate-900 leading-tight">{exp.title || exp.designation || 'Professional Role'}</h3>
-                        <div className="flex items-center text-[10px] text-slate-555 font-bold">
-                          {exp.company && <span className="text-indigo-650">{exp.company}</span>}
-                          {exp.company && (exp.period || exp.duration) && <span className="mx-2">•</span>}
-                          {(exp.period || exp.duration) && <span>{exp.period || exp.duration}</span>}
-                        </div>
-                        {exp.description && (
-                          <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1.5">{exp.description}</p>
-                        )}
+                  (() => {
+                    // Group experiences by company
+                    const groups: Record<string, any[]> = {};
+                    const order: string[] = [];
+                    experiencesToDisplay.forEach((exp: any) => {
+                      const compKey = (exp.company || 'Other').trim();
+                      if (!groups[compKey]) { groups[compKey] = []; order.push(compKey); }
+                      groups[compKey].push(exp);
+                    });
+
+                    return (
+                      <div className="space-y-6">
+                        {order.map((company, gIdx) => {
+                          const roles = groups[company];
+                          const logo = roles[0]?.companyLogo;
+                          return (
+                            <div key={gIdx} className="animate-slide-up opacity-0" style={{ animationDelay: `${gIdx * 60}ms`, animationFillMode: 'forwards' }}>
+                              {/* Company Header */}
+                              <div className="flex items-center gap-3 mb-3">
+                                {logo ? (
+                                  <img src={logo} alt={company} className="h-9 w-9 rounded-lg object-contain border border-slate-100 bg-white p-0.5 shadow-xs" onError={(e) => { (e.target as any).style.display = 'none'; }} />
+                                ) : (
+                                  <div className="h-9 w-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+                                    <Building2 className="h-4 w-4 text-indigo-400" />
+                                  </div>
+                                )}
+                                <div>
+                                  <h3 className="text-xs font-black text-slate-800">{company}</h3>
+                                  <p className="text-[10px] text-slate-400 font-semibold">{roles.length} role{roles.length > 1 ? 's' : ''}</p>
+                                </div>
+                              </div>
+                              {/* Roles Timeline */}
+                              <div className="relative border-l-2 border-indigo-100 pl-5 ml-4 space-y-4">
+                                {roles.map((exp: any, idx: number) => {
+                                  const displayPeriod = exp.period || (exp.startDate ? `${exp.startDate}${exp.endDate ? ` – ${exp.endDate}` : ' – Present'}` : '');
+                                  return (
+                                    <div key={idx} className="relative flex flex-col gap-0.5">
+                                      <span className={`absolute -left-[26px] top-1.5 h-3 w-3 rounded-full border-2 border-white shadow-sm ${exp.isCurrent ? 'bg-emerald-500' : 'bg-indigo-400'}`} />
+                                      <div className="flex items-center gap-2">
+                                        <h4 className="text-xs font-bold text-slate-900">{exp.title || exp.designation || 'Professional Role'}</h4>
+                                        {exp.isCurrent && (
+                                          <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-100 text-[8px] font-black rounded-full uppercase">Current</span>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center flex-wrap gap-x-2 text-[10px] text-slate-500 font-semibold">
+                                        {displayPeriod && <span className="flex items-center gap-1"><Clock className="h-2.5 w-2.5" /> {displayPeriod}</span>}
+                                        {exp.duration && <span>• {exp.duration}</span>}
+                                        {exp.location && <span className="flex items-center gap-0.5"><MapPin className="h-2.5 w-2.5" /> {exp.location}</span>}
+                                      </div>
+                                      {exp.description && (
+                                        <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1">{exp.description}</p>
+                                      )}
+                                      {exp.skills && Array.isArray(exp.skills) && exp.skills.length > 0 && (
+                                        <div className="flex flex-wrap gap-1 mt-1.5">
+                                          {exp.skills.map((s: string, si: number) => (
+                                            <span key={si} className="px-1.5 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded text-[9px] font-bold">{s}</span>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    ))}
+                    );
+                  })()
+                ) : isPipelineActive ? (
+                  <div className="flex items-center gap-3 py-6 justify-center">
+                    <Loader2 className="h-5 w-5 animate-spin text-indigo-400" />
+                    <span className="text-xs text-slate-400 font-semibold">Loading career data from enrichment pipeline...</span>
                   </div>
                 ) : (
                   <p className="text-xs text-slate-450 italic py-3">No verified career history records available.</p>
@@ -847,29 +993,121 @@ export const ContactDetailPage: React.FC = () => {
               {/* Education History */}
               <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs">
                 <h2 className="text-xs font-bold text-slate-800 tracking-wider uppercase border-b border-slate-50 pb-2 mb-4 flex items-center gap-2">
-                  <Award className="h-4 w-4 text-purple-500" /> Academic Background {renderBadge('education')}
+                  <GraduationCap className="h-4 w-4 text-purple-500" /> Academic Background {renderBadge('education')}
                 </h2>
                 
                 {educationToDisplay && educationToDisplay.length > 0 ? (
-                  <div className="relative border-l-2 border-slate-100 pl-5 ml-2.5 space-y-6 py-2">
-                    {educationToDisplay.map((edu: any, idx: number) => (
-                      <div key={idx} className="relative flex flex-col gap-1 animate-slide-up opacity-0" style={{ animationDelay: `${idx * 40}ms`, animationFillMode: 'forwards' }}>
-                        <span className="absolute -left-[26px] top-1.5 h-3.5 w-3.5 rounded-full bg-purple-550 border-2 border-white shadow-sm" />
-                        <h3 className="text-xs font-bold text-slate-900 leading-tight">{edu.degree || 'Academic Degree'}</h3>
-                        <div className="flex items-center text-[10px] text-slate-555 font-bold">
-                          {edu.school && <span className="text-purple-650">{edu.school}</span>}
-                          {edu.school && edu.year && <span className="mx-2">•</span>}
-                          {edu.year && <span>Class of {edu.year}</span>}
+                  <div className="relative border-l-2 border-purple-100 pl-5 ml-2.5 space-y-6 py-2">
+                    {educationToDisplay.map((edu: any, idx: number) => {
+                      const displayYear = edu.year || (edu.startDate ? `${edu.startDate}${edu.endDate ? ` – ${edu.endDate}` : ''}` : '');
+                      return (
+                        <div key={idx} className="relative flex flex-col gap-0.5 animate-slide-up opacity-0" style={{ animationDelay: `${idx * 40}ms`, animationFillMode: 'forwards' }}>
+                          <span className="absolute -left-[26px] top-1.5 h-3.5 w-3.5 rounded-full bg-purple-500 border-2 border-white shadow-sm" />
+                          <h3 className="text-xs font-bold text-slate-900 leading-tight">{edu.degree || edu.fieldOfStudy || 'Academic Program'}</h3>
+                          <div className="flex items-center text-[10px] text-slate-555 font-bold">
+                            {edu.school && <span className="text-purple-650">{edu.school}</span>}
+                            {edu.school && displayYear && <span className="mx-2">•</span>}
+                            {displayYear && <span>{displayYear}</span>}
+                          </div>
+                          {edu.fieldOfStudy && edu.degree && (
+                            <p className="text-[11px] text-slate-500 font-semibold mt-0.5">Field of Study: {edu.fieldOfStudy}</p>
+                          )}
+                          {edu.description && (
+                            <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1">{edu.description}</p>
+                          )}
+                          {edu.activities && (
+                            <p className="text-[10px] text-slate-450 font-medium mt-1 italic">Activities: {edu.activities}</p>
+                          )}
                         </div>
-                        {edu.fieldOfStudy && (
-                          <p className="text-[11px] text-slate-500 font-semibold mt-1">Field of Study: {edu.fieldOfStudy}</p>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
+                  </div>
+                ) : isPipelineActive ? (
+                  <div className="flex items-center gap-3 py-6 justify-center">
+                    <Loader2 className="h-5 w-5 animate-spin text-purple-400" />
+                    <span className="text-xs text-slate-400 font-semibold">Loading education data from enrichment pipeline...</span>
                   </div>
                 ) : (
                   <p className="text-xs text-slate-450 italic py-3">No academic background logs found.</p>
                 )}
+              </div>
+
+              {/* Clubs, Organizations & Volunteering */}
+              <div className="bg-white p-5 border border-slate-100 rounded-xl shadow-xs">
+                <h2 className="text-xs font-bold text-slate-800 tracking-wider uppercase border-b border-slate-50 pb-2 mb-4 flex items-center gap-2">
+                  <Heart className="h-4 w-4 text-rose-500" /> Clubs, Organizations & Volunteering
+                </h2>
+                
+                {(() => {
+                  const orgs: any[] = aiProfile?.organizations || [];
+                  const vols: any[] = aiProfile?.volunteerExperience || [];
+                  const hasData = orgs.length > 0 || vols.length > 0;
+
+                  if (!hasData && isPipelineActive) {
+                    return (
+                      <div className="flex items-center gap-3 py-6 justify-center">
+                        <Loader2 className="h-5 w-5 animate-spin text-rose-400" />
+                        <span className="text-xs text-slate-400 font-semibold">Loading organizations data...</span>
+                      </div>
+                    );
+                  }
+
+                  if (!hasData) {
+                    return (
+                      <div className="text-center py-6">
+                        <div className="p-3 bg-slate-50 rounded-full inline-flex mb-2">
+                          <Users className="h-5 w-5 text-slate-300" />
+                        </div>
+                        <p className="text-xs text-slate-400 italic">No organizations, clubs, or volunteering activities discovered for this contact.</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-4">
+                      {orgs.length > 0 && (
+                        <div>
+                          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Organizations & Associations</h3>
+                          <div className="space-y-2">
+                            {orgs.map((org: any, idx: number) => (
+                              <div key={idx} className="flex items-start gap-3 p-3 bg-slate-50/50 border border-slate-100 rounded-lg">
+                                <div className="p-1.5 bg-indigo-50 rounded-md text-indigo-500 shrink-0 mt-0.5">
+                                  <Building2 className="h-3.5 w-3.5" />
+                                </div>
+                                <div className="min-w-0">
+                                  <h4 className="text-xs font-bold text-slate-800">{org.name || 'Unknown Organization'}</h4>
+                                  {org.role && <p className="text-[10px] text-slate-500 font-semibold mt-0.5">{org.role}</p>}
+                                  {org.period && <p className="text-[10px] text-slate-400 font-medium">{org.period}</p>}
+                                  {org.description && <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">{org.description}</p>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {vols.length > 0 && (
+                        <div>
+                          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Volunteering & Community</h3>
+                          <div className="space-y-2">
+                            {vols.map((vol: any, idx: number) => (
+                              <div key={idx} className="flex items-start gap-3 p-3 bg-rose-50/30 border border-rose-100/50 rounded-lg">
+                                <div className="p-1.5 bg-rose-50 rounded-md text-rose-500 shrink-0 mt-0.5">
+                                  <Heart className="h-3.5 w-3.5" />
+                                </div>
+                                <div className="min-w-0">
+                                  <h4 className="text-xs font-bold text-slate-800">{vol.name || 'Unknown Organization'}</h4>
+                                  {vol.role && <p className="text-[10px] text-slate-500 font-semibold mt-0.5">{vol.role}</p>}
+                                  {vol.period && <p className="text-[10px] text-slate-400 font-medium">{vol.period}</p>}
+                                  {vol.description && <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">{vol.description}</p>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

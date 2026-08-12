@@ -24,6 +24,7 @@ export const createContactSchema = z.object({
     hobbies: z.array(z.string()).default([]),
     decisionMakerScore: z.number().min(0).max(100).default(0),
     source: z.nativeEnum(ContactSource).default(ContactSource.MANUAL),
+    overviewConfirmed: z.boolean().default(false).optional(),
     
     // Child Relations
     tags: z.array(z.string()).default([]),
@@ -52,6 +53,7 @@ export const updateContactSchema = z.object({
     hobbies: z.array(z.string()).optional(),
     decisionMakerScore: z.number().min(0).max(100).optional(),
     source: z.nativeEnum(ContactSource).optional(),
+    overviewConfirmed: z.boolean().optional(),
     
     tags: z.array(z.string()).optional(),
   }),

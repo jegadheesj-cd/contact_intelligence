@@ -107,19 +107,79 @@ export class PhantomBusterEnricher {
   private mapToCandidateProfile(pbData: any, originalUrl: string): CandidateProfile {
     // Safely map PhantomBuster's JSON schema into our internal CandidateProfile model
     
-    const experience = (pbData.jobs || pbData.experience || []).map((job: any) => ({
-      title: job.jobTitle || job.title || 'Unknown Role',
-      company: job.companyName || job.company || 'Unknown Company',
-      period: job.dateRange || job.dates || job.duration || '',
-      description: job.description || ''
-    }));
+    const experience = (pbData.jobs || pbData.experience || []).map((job: any) => {
+      const period = job.dateRange || job.dates || job.duration || '';
+      const isCurrent = job.isCurrent || /present|current/i.test(period) || /present/i.test(job.endDate || '');
+      
+      let startDate = job.startDate || '';
+      let endDate = job.endDate || '';
+      if (period && (!startDate || !endDate)) {
+        const parts = period.split(/[–\-\—\to]/);
+        if (parts.length > 0 && !startDate) startDate = parts[0].trim();
+        if (parts.length > 1 && !endDate) endDate = parts[1].trim();
+      }
 
-    const education = (pbData.schools || pbData.education || []).map((edu: any) => ({
-      school: edu.schoolName || edu.school || 'Unknown School',
-      degree: edu.degreeName || edu.degree || '',
-      year: edu.dateRange || edu.dates || edu.duration || '',
-      fieldOfStudy: edu.fieldOfStudy || ''
-    }));
+      return {
+        title: job.jobTitle || job.title || 'Unknown Role',
+        company: job.companyName || job.company || 'Unknown Company',
+        companyLogo: job.companyLogoUrl || job.companyLogo || job.logoUrl || job.logo || job.logo_url || '',
+        period,
+        startDate,
+        endDate,
+        isCurrent: !!isCurrent,
+        duration: job.duration || job.durationString || '',
+        location: job.location || '',
+        description: job.description || '',
+        skills: Array.isArray(job.skills) ? job.skills : (typeof job.skills === 'string' ? job.skills.split(',').map((s: string) => s.trim()) : [])
+      };
+    });
+
+    const education = (pbData.schools || pbData.education || []).map((edu: any) => {
+      const year = edu.dateRange || edu.dates || edu.duration || edu.year || '';
+      
+      let startDate = edu.startDate || '';
+      let endDate = edu.endDate || '';
+      if (year && (!startDate || !endDate)) {
+        const parts = year.split(/[–\-\—\to]/);
+        if (parts.length > 0 && !startDate) startDate = parts[0].trim();
+        if (parts.length > 1 && !endDate) endDate = parts[1].trim();
+      }
+
+      return {
+        school: edu.schoolName || edu.school || 'Unknown School',
+        degree: edu.degreeName || edu.degree || '',
+        year,
+        startDate,
+        endDate,
+        fieldOfStudy: edu.fieldOfStudy || '',
+        description: edu.description || '',
+        activities: edu.activities || edu.activitiesAndSocieties || ''
+      };
+    });
+
+    const volunteerExperience = (pbData.volunteerExperiences || pbData.volunteerExperience || pbData.volunteering || pbData.volunteer || []).map((vol: any) => {
+      if (typeof vol === 'string') {
+        return { name: vol, role: '', period: '', description: '' };
+      }
+      return {
+        name: vol.companyName || vol.company || vol.organization || vol.name || 'Unknown Organization',
+        role: vol.role || vol.title || '',
+        period: vol.dateRange || vol.dates || vol.period || '',
+        description: vol.description || ''
+      };
+    });
+
+    const organizations = (pbData.organizations || pbData.associations || pbData.clubs || pbData.groups || []).map((org: any) => {
+      if (typeof org === 'string') {
+        return { name: org, role: '', period: '', description: '' };
+      }
+      return {
+        name: org.name || org.organizationName || org.company || 'Unknown Organization',
+        role: org.role || org.position || org.title || '',
+        period: org.dateRange || org.dates || org.period || '',
+        description: org.description || ''
+      };
+    });
 
     const skills = (pbData.skills || []).map((s: any) => {
       if (typeof s === 'string') return s;
@@ -147,6 +207,8 @@ export class PhantomBusterEnricher {
       summary: pbData.summary || pbData.about || '',
       experience,
       education,
+      organizations,
+      volunteerExperience,
       skills: skills.filter(Boolean),
       certifications: certifications.filter(Boolean),
       languages: languages.filter(Boolean),

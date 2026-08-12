@@ -71,6 +71,7 @@ model Contact {
   hobbies            String[]           @default([])
   decisionMakerScore Int                @default(0)
   source             ContactSource      @default(MANUAL)
+  overviewConfirmed  Boolean            @default(false)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   tags               Tag[]              @relation("ContactTags")

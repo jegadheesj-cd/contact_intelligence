@@ -115,13 +115,26 @@ export class ContactsService {
         await this.addNote(userId, duplicate.id, data.notes);
       }
       // If there is linkedInUrl, update it
-      if (data.linkedInUrl && !(duplicate as any).professionalProfile?.mergedProfile?.profileUrl) {
+      if (data.linkedInUrl) {
+        const existingProf = await prisma.professionalProfile.findUnique({
+          where: { contactId: duplicate.id }
+        });
+        let newMergedProfile: any = existingProf?.mergedProfile || {};
+        newMergedProfile.publicProfiles = {
+          value: [{ platform: 'LinkedIn', url: data.linkedInUrl, confidence: 100 }],
+          source: 'Manual Entry',
+          confidence: 100,
+          timestamp: new Date().toISOString(),
+          verification: 'Verified'
+        };
         await prisma.professionalProfile.upsert({
           where: { contactId: duplicate.id },
           create: {
             contactId: duplicate.id,
+            mergedProfile: newMergedProfile,
           },
           update: {
+            mergedProfile: newMergedProfile,
           },
         });
       }
@@ -154,7 +167,17 @@ export class ContactsService {
         } : {}),
         // Optional Professional Profile
         professionalProfile: {
-          create: {},
+          create: {
+            mergedProfile: linkedInUrl ? {
+              publicProfiles: {
+                value: [{ platform: 'LinkedIn', url: linkedInUrl, confidence: 100 }],
+                source: 'Manual Entry',
+                confidence: 100,
+                timestamp: new Date().toISOString(),
+                verification: 'Verified'
+              }
+            } : null
+          },
         },
         // Optional AI Summary Placeholder
         aiSummary: {
@@ -220,10 +243,36 @@ export class ContactsService {
     // Check contact exists
     await this.getContactById(userId, contactId);
 
-    const { tags, ...updateData } = data;
+    const { tags, linkedInUrl, ...updateData } = data;
     
     if (updateData.designation !== undefined) {
       updateData.decisionMakerScore = calculateDecisionMakerScore(updateData.designation || '');
+    }
+
+    if (linkedInUrl !== undefined) {
+      const existingProfile = await prisma.professionalProfile.findUnique({
+        where: { contactId },
+      });
+
+      let newMergedProfile: any = existingProfile?.mergedProfile || {};
+      newMergedProfile.publicProfiles = {
+        value: [{ platform: 'LinkedIn', url: linkedInUrl, confidence: 100 }],
+        source: 'Manual Entry',
+        confidence: 100,
+        timestamp: new Date().toISOString(),
+        verification: 'Verified'
+      };
+
+      await prisma.professionalProfile.upsert({
+        where: { contactId },
+        create: {
+          contactId,
+          mergedProfile: newMergedProfile,
+        },
+        update: {
+          mergedProfile: newMergedProfile,
+        },
+      });
     }
 
     const contact = await prisma.contact.update({

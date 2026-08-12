@@ -15,14 +15,45 @@ export interface MergedProfile {
   industry?: VerifiedField<string>;
   profileImage?: VerifiedField<string>;
   summary?: VerifiedField<string>;
-  experience: VerifiedField<Array<{ title: string; company: string; period: string; description?: string }>>;
-  education: VerifiedField<Array<{ school: string; degree: string; year: string; fieldOfStudy?: string }>>;
+  experience: VerifiedField<Array<{ 
+    title: string; 
+    company: string; 
+    companyLogo?: string; 
+    period: string; 
+    startDate?: string; 
+    endDate?: string; 
+    isCurrent?: boolean; 
+    duration?: string; 
+    location?: string; 
+    description?: string; 
+    skills?: string[]; 
+  }>>;
+  education: VerifiedField<Array<{ 
+    school: string; 
+    degree?: string; 
+    year?: string; 
+    startDate?: string; 
+    endDate?: string; 
+    fieldOfStudy?: string; 
+    description?: string; 
+    activities?: string; 
+  }>>;
   skills: VerifiedField<string[]>;
   projects: VerifiedField<Array<{ name: string; description: string; technologies?: string[]; duration?: string }>>;
   certifications?: VerifiedField<string[]>;
   achievements?: VerifiedField<string[]>;
-  organizations?: VerifiedField<string[]>;
-  volunteerExperience?: VerifiedField<string[]>;
+  organizations?: VerifiedField<Array<{ 
+    name: string; 
+    role?: string; 
+    period?: string; 
+    description?: string; 
+  }>>;
+  volunteerExperience?: VerifiedField<Array<{ 
+    name: string; 
+    role?: string; 
+    period?: string; 
+    description?: string; 
+  }>>;
   publications?: VerifiedField<string[]>;
   languages?: VerifiedField<string[]>;
   interests?: VerifiedField<string[]>;
@@ -68,6 +99,7 @@ export class ProfileMergeService {
       certifications: { value: [], source: 'None', confidence: 0, timestamp, verification: 'Unverified' },
       achievements: { value: [], source: 'None', confidence: 0, timestamp, verification: 'Unverified' },
       organizations: { value: [], source: 'None', confidence: 0, timestamp, verification: 'Unverified' },
+      volunteerExperience: { value: [], source: 'None', confidence: 0, timestamp, verification: 'Unverified' },
       languages: { value: [], source: 'None', confidence: 0, timestamp, verification: 'Unverified' },
       interests: { value: [], source: 'None', confidence: 0, timestamp, verification: 'Unverified' },
       repositories: { value: [], source: 'None', confidence: 0, timestamp, verification: 'Unverified' },
@@ -124,7 +156,7 @@ export class ProfileMergeService {
       }
 
       // 3. Structured Arrays (take from highest confidence source that has entries)
-      const arrayFields = ['experience', 'education', 'projects', 'repositories', 'pinnedRepositories'];
+      const arrayFields = ['projects', 'repositories', 'pinnedRepositories'];
       for (const field of arrayFields) {
         if (response.data[field] && Array.isArray(response.data[field]) && response.data[field].length > 0) {
           if (!mergedProfile[field] || mergedProfile[field].value.length === 0) {
@@ -140,9 +172,146 @@ export class ProfileMergeService {
         }
       }
 
+      // 3.5. Merged and Deduplicated Arrays (Experience, Education, Organizations, Volunteering)
+      if (response.data.experience && Array.isArray(response.data.experience) && response.data.experience.length > 0) {
+        const currentExp = mergedProfile.experience.value || [];
+        const updatedExp = [...currentExp];
+        let addedNew = false;
+
+        for (const exp of response.data.experience) {
+          const compClean = (exp.company || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const titleClean = (exp.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const periodClean = (exp.period || exp.startDate || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+          const isDuplicate = updatedExp.some((existing: any) => {
+            const eCompClean = (existing.company || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const eTitleClean = (existing.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const ePeriodClean = (existing.period || existing.startDate || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            return eCompClean === compClean && eTitleClean === titleClean && (ePeriodClean === periodClean || !ePeriodClean || !periodClean);
+          });
+
+          if (!isDuplicate) {
+            updatedExp.push(exp);
+            addedNew = true;
+          }
+        }
+
+        if (addedNew || (updatedExp.length > 0 && currentExp.length === 0)) {
+          mergedProfile.experience = {
+            value: updatedExp,
+            source: mergedProfile.experience.source === 'None' ? response.sourceName : mergedProfile.experience.source,
+            confidence: mergedProfile.experience.confidence === 0 ? response.confidence : mergedProfile.experience.confidence,
+            timestamp,
+            verification: mergedProfile.experience.verification === 'Unverified' ? verification : mergedProfile.experience.verification
+          };
+          sourceAttribution.experience = mergedProfile.experience;
+        }
+      }
+
+      if (response.data.education && Array.isArray(response.data.education) && response.data.education.length > 0) {
+        const currentEdu = mergedProfile.education.value || [];
+        const updatedEdu = [...currentEdu];
+        let addedNew = false;
+
+        for (const edu of response.data.education) {
+          const schoolClean = (edu.school || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const degreeClean = (edu.degree || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const yearClean = (edu.year || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+          const isDuplicate = updatedEdu.some((existing: any) => {
+            const eSchoolClean = (existing.school || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const eDegreeClean = (existing.degree || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const eYearClean = (existing.year || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            return eSchoolClean === schoolClean && (eDegreeClean === degreeClean || !eDegreeClean || !degreeClean) && (eYearClean === yearClean || !eYearClean || !yearClean);
+          });
+
+          if (!isDuplicate) {
+            updatedEdu.push(edu);
+            addedNew = true;
+          }
+        }
+
+        if (addedNew || (updatedEdu.length > 0 && currentEdu.length === 0)) {
+          mergedProfile.education = {
+            value: updatedEdu,
+            source: mergedProfile.education.source === 'None' ? response.sourceName : mergedProfile.education.source,
+            confidence: mergedProfile.education.confidence === 0 ? response.confidence : mergedProfile.education.confidence,
+            timestamp,
+            verification: mergedProfile.education.verification === 'Unverified' ? verification : mergedProfile.education.verification
+          };
+          sourceAttribution.education = mergedProfile.education;
+        }
+      }
+
+      if (response.data.organizations && Array.isArray(response.data.organizations) && response.data.organizations.length > 0) {
+        const currentOrg = mergedProfile.organizations.value || [];
+        const updatedOrg = [...currentOrg];
+        let addedNew = false;
+
+        for (const org of response.data.organizations) {
+          const nameClean = (org.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const roleClean = (org.role || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+          const isDuplicate = updatedOrg.some((existing: any) => {
+            const eNameClean = (existing.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const eRoleClean = (existing.role || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            return eNameClean === nameClean && (eRoleClean === roleClean || !eRoleClean || !roleClean);
+          });
+
+          if (!isDuplicate) {
+            updatedOrg.push(org);
+            addedNew = true;
+          }
+        }
+
+        if (addedNew || (updatedOrg.length > 0 && currentOrg.length === 0)) {
+          mergedProfile.organizations = {
+            value: updatedOrg,
+            source: mergedProfile.organizations.source === 'None' ? response.sourceName : mergedProfile.organizations.source,
+            confidence: mergedProfile.organizations.confidence === 0 ? response.confidence : mergedProfile.organizations.confidence,
+            timestamp,
+            verification: mergedProfile.organizations.verification === 'Unverified' ? verification : mergedProfile.organizations.verification
+          };
+          sourceAttribution.organizations = mergedProfile.organizations;
+        }
+      }
+
+      if (response.data.volunteerExperience && Array.isArray(response.data.volunteerExperience) && response.data.volunteerExperience.length > 0) {
+        const currentVol = mergedProfile.volunteerExperience.value || [];
+        const updatedVol = [...currentVol];
+        let addedNew = false;
+
+        for (const vol of response.data.volunteerExperience) {
+          const nameClean = (vol.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const roleClean = (vol.role || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+          const isDuplicate = updatedVol.some((existing: any) => {
+            const eNameClean = (existing.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const eRoleClean = (existing.role || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            return eNameClean === nameClean && (eRoleClean === roleClean || !eRoleClean || !roleClean);
+          });
+
+          if (!isDuplicate) {
+            updatedVol.push(vol);
+            addedNew = true;
+          }
+        }
+
+        if (addedNew || (updatedVol.length > 0 && currentVol.length === 0)) {
+          mergedProfile.volunteerExperience = {
+            value: updatedVol,
+            source: mergedProfile.volunteerExperience.source === 'None' ? response.sourceName : mergedProfile.volunteerExperience.source,
+            confidence: mergedProfile.volunteerExperience.confidence === 0 ? response.confidence : mergedProfile.volunteerExperience.confidence,
+            timestamp,
+            verification: mergedProfile.volunteerExperience.verification === 'Unverified' ? verification : mergedProfile.volunteerExperience.verification
+          };
+          sourceAttribution.volunteerExperience = mergedProfile.volunteerExperience;
+        }
+      }
+
       // 4. Simple List Arrays (merge & deduplicate list items from multiple sources)
       const listFields = [
-        'skills', 'certifications', 'achievements', 'organizations',
+        'skills', 'certifications', 'achievements',
         'languages', 'interests', 'primaryLanguages', 'technologies'
       ];
       for (const field of listFields) {
